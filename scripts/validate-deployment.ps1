@@ -1,12 +1,12 @@
 <#
 .SYNOPSIS
-    Validates that the Azure SRE Agent Demo Lab deployment is healthy.
+    Validates that the Movistar BSS Demo Lab deployment is healthy.
 
 .DESCRIPTION
     This script checks:
     - Azure resources are provisioned and healthy
     - AKS cluster is reachable
-    - All pods in the demo application are running
+    - All pods in the Movistar BSS application are running
     - Services have endpoints assigned
     - Basic connectivity tests pass
 
@@ -59,7 +59,7 @@ function Write-Section {
 Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                   Azure SRE Agent Demo Lab - Validation                      ║
+║                   Movistar BSS Demo Lab - Validation                      ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  Checking deployment health and readiness...                                 ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -178,12 +178,12 @@ if (Write-Check "All nodes are Ready" ($healthyNodes -eq $totalNodes) "$healthyN
 # =============================================================================
 # APPLICATION HEALTH
 # =============================================================================
-Write-Section "Demo Application (pets namespace)"
+Write-Section "Movistar BSS Application (movistar namespace)"
 
 # Check if namespace exists
-$namespace = kubectl get namespace pets -o json 2>$null | ConvertFrom-Json
+$namespace = kubectl get namespace movistar -o json 2>$null | ConvertFrom-Json
 $totalChecks++
-if (Write-Check "Namespace 'pets' exists" ($null -ne $namespace)) {
+if (Write-Check "Namespace 'movistar' exists" ($null -ne $namespace)) {
     $passedChecks++
 }
 else {
@@ -192,7 +192,7 @@ else {
 
 # Check pods
 if ($namespace) {
-    $pods = kubectl get pods -n pets -o json 2>$null | ConvertFrom-Json
+    $pods = kubectl get pods -n movistar -o json 2>$null | ConvertFrom-Json
     
     if ($pods.items.Count -gt 0) {
         Write-Host "`n  Pod Status:" -ForegroundColor White
@@ -221,14 +221,14 @@ if ($namespace) {
         Write-Host "`n  Summary: $runningPods/$($pods.items.Count) pods running" -ForegroundColor $(if ($runningPods -eq $pods.items.Count) { "Green" } else { "Yellow" })
     }
     else {
-        Write-Host "  ⚠️  No pods found in 'pets' namespace" -ForegroundColor Yellow
+        Write-Host "  ⚠️  No pods found in 'movistar' namespace" -ForegroundColor Yellow
         Write-Host "     Run: kubectl apply -f k8s/base/application.yaml" -ForegroundColor Gray
     }
 }
 
 # Check services
 Write-Host "`n  Services:" -ForegroundColor White
-$services = kubectl get svc -n pets -o json 2>$null | ConvertFrom-Json
+$services = kubectl get svc -n movistar -o json 2>$null | ConvertFrom-Json
 
 foreach ($svc in $services.items) {
     $svcName = $svc.metadata.name
@@ -258,15 +258,15 @@ foreach ($svc in $services.items) {
     }
 }
 
-# Check for store-front LoadBalancer specifically
-$storeFrontSvc = $services.items | Where-Object { $_.metadata.name -eq "store-front" }
+# Check for customer-portal LoadBalancer specifically
+$storeFrontSvc = $services.items | Where-Object { $_.metadata.name -eq "customer-portal" }
 if ($storeFrontSvc -and $storeFrontSvc.spec.type -eq "LoadBalancer") {
     $externalIP = $null
     if ($storeFrontSvc.status.loadBalancer.ingress -and $storeFrontSvc.status.loadBalancer.ingress.Count -gt 0) {
         $externalIP = $storeFrontSvc.status.loadBalancer.ingress[0].ip
     }
     if ($externalIP) {
-        Write-Host "`n  🌐 Store Front URL: http://$externalIP" -ForegroundColor Cyan
+        Write-Host "`n  🌐 Customer Portal URL: http://$externalIP" -ForegroundColor Cyan
     }
 }
 
@@ -328,8 +328,8 @@ else {
 
 Common fixes:
 - Deploy application: kubectl apply -f k8s/base/application.yaml
-- Wait for pods: kubectl get pods -n pets -w
-- Check events: kubectl get events -n pets --sort-by='.lastTimestamp'
+- Wait for pods: kubectl get pods -n movistar -w
+- Check events: kubectl get events -n movistar --sort-by='.lastTimestamp'
 
 "@ -ForegroundColor Yellow
 }

@@ -1,0 +1,25 @@
+api_version: azuresre.ai/v1
+kind: Hook
+spec:
+  name: approval-required-restarts
+  description: Requires a portal approval before restart, redeploy, or reboot actions on high-criticality resources.
+  type: Stop
+  matchTools:
+    - RunAzCliWriteCommands
+    - RunKubectlCommands
+  policy:
+    conditionGroups:
+      anyOf:
+        - name: restart-on-high-criticality-resource
+          allOf:
+            - field: command
+              operator: matches
+              value: (?i)\b(restart|redeploy|reboot)\b
+            - field: resourceTags.criticality
+              operator: equals
+              value: high
+    action: requireApproval
+    approval:
+      provider: Portal
+      instructions: Review blast radius, validate rollback steps, and approve the change in the Azure portal before execution.
+    message: Human approval is required for restart, redeploy, or reboot actions on resources tagged criticality=high.

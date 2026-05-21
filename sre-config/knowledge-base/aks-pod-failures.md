@@ -1,6 +1,6 @@
 # AKS Pod Failure Investigation Runbook
 
-Diagnose and remediate pod-level failures in the AKS cluster running the pets e-commerce application. This runbook covers OOMKilled, CrashLoopBackOff, ImagePullBackOff, Pending pods, probe failures, and missing configuration scenarios.
+Diagnose and remediate pod-level failures in the AKS cluster running the Movistar BSS application. This runbook covers OOMKilled, CrashLoopBackOff, ImagePullBackOff, Pending pods, probe failures, and missing configuration scenarios.
 
 ---
 
@@ -9,7 +9,7 @@ Diagnose and remediate pod-level failures in the AKS cluster running the pets e-
 Run initial triage to classify the issue:
 
 ```bash
-kubectl get pods -n pets --field-selector=status.phase!=Running
+kubectl get pods -n movistar --field-selector=status.phase!=Running
 ```
 
 | Pod Status | Likely Cause | Jump To |
@@ -28,28 +28,28 @@ kubectl get pods -n pets --field-selector=status.phase!=Running
 **Symptoms:** Pod restarts repeatedly, `LastState.Terminated.Reason = OOMKilled`
 
 **Diagnostic steps:**
-1. Check container termination reason:
+1. Check container termination reason on `activation-service`:
    ```bash
-   kubectl describe pod -l app=<service-name> -n pets | grep -A 5 "Last State"
+   kubectl describe pod -l app=activation-service -n movistar | grep -A 5 "Last State"
    ```
 2. Check current memory limits vs actual usage:
    ```bash
-   kubectl top pods -n pets
-   kubectl get pod <pod-name> -n pets -o jsonpath='{.spec.containers[0].resources}'
+   kubectl top pods -n movistar
+   kubectl get pod <activation-pod-name> -n movistar -o jsonpath='{.spec.containers[0].resources}'
    ```
 3. Query Log Analytics for memory trends:
    ```kql
    KubePodInventory
-   | where Namespace == "pets"
-   | where Name contains "<service-name>"
+   | where Namespace == "movistar"
+   | where Name contains "activation-service"
    | where TimeGenerated > ago(1h)
    | project TimeGenerated, Name, PodStatus, PodRestartCount
    | order by TimeGenerated desc
    ```
 
 **Remediation:**
-- Increase memory limits in the deployment spec
-- Check for memory leaks in application code
+- Increase memory limits in the `activation-service` deployment spec
+- Check for memory leaks in `activation-service` during activation or top-up peaks
 - Apply healthy baseline: `kubectl apply -f k8s/base/application.yaml`
 
 ---
@@ -59,13 +59,13 @@ kubectl get pods -n pets --field-selector=status.phase!=Running
 **Symptoms:** Container starts, exits immediately, Kubernetes keeps restarting it
 
 **Diagnostic steps:**
-1. Check container exit code:
+1. Check container exit code on `catalog-service`:
    ```bash
-   kubectl describe pod -l app=<service-name> -n pets | grep -A 10 "Last State"
+   kubectl describe pod -l app=catalog-service -n movistar | grep -A 10 "Last State"
    ```
 2. Check previous container logs:
    ```bash
-   kubectl logs -l app=<service-name> -n pets --previous
+   kubectl logs -l app=catalog-service -n movistar --previous
    ```
 3. Common exit codes:
    - Exit 1: Application error
@@ -73,8 +73,8 @@ kubectl get pods -n pets --field-selector=status.phase!=Running
    - Exit 139: Segfault
 
 **Remediation:**
-- Fix the startup command or entrypoint
-- Verify environment variables and config
+- Fix the startup command or entrypoint for `catalog-service`
+- Verify environment variables and config consumed by `catalog-service`
 - Apply healthy baseline: `kubectl apply -f k8s/base/application.yaml`
 
 ---
@@ -84,13 +84,13 @@ kubectl get pods -n pets --field-selector=status.phase!=Running
 **Symptoms:** Pod stuck in ImagePullBackOff or ErrImagePull
 
 **Diagnostic steps:**
-1. Check the image reference:
+1. Check the image reference on `provisioning-service`:
    ```bash
-   kubectl describe pod -l app=<service-name> -n pets | grep "Image:"
+   kubectl describe pod -l app=provisioning-service -n movistar | grep "Image:"
    ```
 2. Check events for pull errors:
    ```bash
-   kubectl get events -n pets --field-selector reason=Failed --sort-by=.metadata.creationTimestamp
+   kubectl get events -n movistar --field-selector reason=Failed --sort-by=.metadata.creationTimestamp
    ```
 3. Verify image exists in registry:
    ```bash
@@ -98,7 +98,7 @@ kubectl get pods -n pets --field-selector=status.phase!=Running
    ```
 
 **Remediation:**
-- Correct the image tag in the deployment
+- Correct the image tag in the `provisioning-service` deployment
 - Verify ACR credentials and AKS pull permissions
 - Apply healthy baseline: `kubectl apply -f k8s/base/application.yaml`
 
@@ -111,7 +111,7 @@ kubectl get pods -n pets --field-selector=status.phase!=Running
 **Diagnostic steps:**
 1. Check scheduler events:
    ```bash
-   kubectl describe pod <pod-name> -n pets | grep -A 5 "Events"
+   kubectl describe pod <pod-name> -n movistar | grep -A 5 "Events"
    ```
 2. Check node capacity vs requests:
    ```bash
@@ -138,22 +138,22 @@ kubectl get pods -n pets --field-selector=status.phase!=Running
 **Symptoms:** Pod is Running but not Ready, restarts due to liveness probe failure
 
 **Diagnostic steps:**
-1. Check probe configuration:
+1. Check probe configuration on `customer-portal`:
    ```bash
-   kubectl get pod <pod-name> -n pets -o jsonpath='{.spec.containers[0].livenessProbe}'
-   kubectl get pod <pod-name> -n pets -o jsonpath='{.spec.containers[0].readinessProbe}'
+   kubectl get pod <customer-portal-pod> -n movistar -o jsonpath='{.spec.containers[0].livenessProbe}'
+   kubectl get pod <customer-portal-pod> -n movistar -o jsonpath='{.spec.containers[0].readinessProbe}'
    ```
 2. Check events for probe failure:
    ```bash
-   kubectl describe pod <pod-name> -n pets | grep -A 3 "Unhealthy"
+   kubectl describe pod <customer-portal-pod> -n movistar | grep -A 3 "Unhealthy"
    ```
 3. Test the health endpoint manually:
    ```bash
-   kubectl exec <pod-name> -n pets -- curl -s localhost:<port>/health
+   kubectl exec <customer-portal-pod> -n movistar -- curl -s localhost:<port>/health
    ```
 
 **Remediation:**
-- Fix the health endpoint path, port, or response
+- Fix the `customer-portal` health endpoint path, port, or response
 - Adjust probe timing (initialDelaySeconds, periodSeconds, failureThreshold)
 - Apply healthy baseline: `kubectl apply -f k8s/base/application.yaml`
 
@@ -161,25 +161,25 @@ kubectl get pods -n pets --field-selector=status.phase!=Running
 
 ## Step 2F: Missing Configuration
 
-**Symptoms:** Pod in CreateContainerConfigError, references a ConfigMap or Secret that doesn't exist
+**Symptoms:** Pod in CreateContainerConfigError, references a ConfigMap or Secret that does not exist
 
 **Diagnostic steps:**
-1. Check pod events:
+1. Check pod events on `csr-console`:
    ```bash
-   kubectl describe pod <pod-name> -n pets | grep -A 5 "Events"
+   kubectl describe pod -l app=csr-console -n movistar | grep -A 5 "Events"
    ```
 2. List available ConfigMaps and Secrets:
    ```bash
-   kubectl get configmaps -n pets
-   kubectl get secrets -n pets
+   kubectl get configmaps -n movistar
+   kubectl get secrets -n movistar
    ```
 3. Check which configuration is referenced:
    ```bash
-   kubectl get pod <pod-name> -n pets -o jsonpath='{.spec.containers[0].envFrom}'
+   kubectl get pod <csr-console-pod> -n movistar -o jsonpath='{.spec.containers[0].envFrom}'
    ```
 
 **Remediation:**
-- Create the missing ConfigMap or Secret
+- Create the missing ConfigMap or Secret required by `csr-console`
 - Fix the reference in the deployment spec
 - Apply healthy baseline: `kubectl apply -f k8s/base/application.yaml`
 
@@ -193,4 +193,4 @@ To restore **all** services to a known healthy state:
 kubectl apply -f k8s/base/application.yaml
 ```
 
-This reapplies the baseline deployment with correct images, resource limits, probes, and configuration references for all services in the pets namespace.
+This reapplies the baseline deployment with correct images, resource limits, probes, and configuration references for all services in the `movistar` namespace.

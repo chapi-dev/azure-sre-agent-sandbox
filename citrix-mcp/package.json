@@ -1,0 +1,21 @@
+{
+  "name": "citrix-mcp",
+  "version": "0.1.0",
+  "description": "Demo MCP server that wraps Citrix Cloud DaaS REST APIs for Azure SRE Agent.",
+  "type": "module",
+  "private": true,
+  "main": "src/server.js",
+  "engines": {
+    "node": "20.x"
+  },
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.0.0",
+    "@azure/keyvault-secrets": "^4.0.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "axios": "^1.0.0",
+    "express": "^4.21.0"
+  }
+}

@@ -1,0 +1,54 @@
+api_version: azuresre.ai/v2
+kind: Plugin
+spec:
+  name: jira-http-plugin
+  description: Wraps core Jira REST operations so the SRE Agent can open incidents, add comments, and move workflow state.
+  type: HTTP
+  baseUri: https://YOUR_DOMAIN.atlassian.net/rest/api/3
+  authenticationType: Basic
+  authentication:
+    usernameSecretRef: jira-email
+    passwordSecretRef: jira-api-token
+  operations:
+    - id: create_issue
+      method: POST
+      path: /issue
+      params:
+        - name: projectKey
+          in: body
+          type: string
+        - name: summary
+          in: body
+          type: string
+        - name: description
+          in: body
+          type: string
+        - name: issueType
+          in: body
+          type: string
+      returns:
+        type: object
+    - id: add_comment
+      method: POST
+      path: /issue/{issueKey}/comment
+      params:
+        - name: issueKey
+          in: path
+          type: string
+        - name: comment
+          in: body
+          type: string
+      returns:
+        type: object
+    - id: transition_issue
+      method: POST
+      path: /issue/{issueKey}/transitions
+      params:
+        - name: issueKey
+          in: path
+          type: string
+        - name: transitionId
+          in: body
+          type: string
+      returns:
+        type: object

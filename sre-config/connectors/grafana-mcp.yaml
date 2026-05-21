@@ -1,0 +1,17 @@
+# Grafana MCP Connector — Dataplane v2 API format
+# Connection options:
+# - Grafana hosted MCP endpoint
+# - Self-hosted `grafana/mcp-grafana` container image
+# - Azure Managed Grafana MCP endpoint when it becomes available for your tenant/region
+# Use a Grafana service account token with only the dashboard and query permissions the lab needs.
+api_version: azuresre.ai/v2
+kind: DataConnector
+spec:
+  name: grafana-mcp
+  dataConnectorType: StreamableHttp
+  dataSource: grafana
+  serverUri: https://YOUR_GRAFANA_MCP_URL/mcp
+  authenticationType: BearerToken
+  defaultOrgId: 1
+  credentials:
+    token: YOUR_GRAFANA_SERVICE_ACCOUNT_TOKEN

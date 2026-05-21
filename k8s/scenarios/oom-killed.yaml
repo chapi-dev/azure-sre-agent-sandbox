@@ -1,21 +1,12 @@
 # =============================================================================
-# Breakable Scenarios for Azure SRE Agent Demo
+# Movistar BSS Application (Telefónica demo, rebranded from AKS-store-demo)
 # =============================================================================
-# This file contains various failure scenarios that can be applied to the
-# AKS Store Demo application for demonstrating Azure SRE Agent diagnosis
-# capabilities.
+# SCENARIO 1: OOMKilled - Activations failing
+# =============================================================================
+# This scenario causes activation-service to run out of memory during peak
+# provisioning load, simulating failed activations in the Movistar BSS lab.
 #
-# Each scenario is in its own YAML document separated by ---
-# Apply specific scenarios with: kubectl apply -f scenarios/<scenario>.yaml
-#
-# See docs/BREAKABLE-SCENARIOS.md for detailed instructions on using each.
-# =============================================================================
-
-# =============================================================================
-# SCENARIO 1: OOMKilled - Out of Memory Crash
-# =============================================================================
-# This scenario causes the order-service to run out of memory and crash.
-# SRE Agent can diagnose: "Pod is OOMKilled", recommend increasing memory limits.
+# SRE Agent can diagnose: Pod is OOMKilled, recommend increasing memory limits.
 #
 # HOW TO BREAK:
 # kubectl apply -f k8s/scenarios/oom-killed.yaml
@@ -27,10 +18,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: order-service
-  namespace: pets
+  name: activation-service
+  namespace: movistar
   labels:
-    app: order-service
+    app: activation-service
     scenario: oom-killed
     sre-demo: breakable
 spec:
@@ -39,16 +30,16 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: order-service
+      app: activation-service
   template:
     metadata:
       labels:
-        app: order-service
+        app: activation-service
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: order-service
+        - name: activation-service
           image: ghcr.io/azure-samples/aks-store-demo/order-service:latest
           ports:
             - containerPort: 3000
@@ -62,7 +53,7 @@ spec:
               cpu: "200m"
           env:
             - name: ORDER_QUEUE_HOSTNAME
-              value: "rabbitmq"
+              value: "provisioning-queue"
             - name: ORDER_QUEUE_PORT
               value: "5672"
             - name: ORDER_QUEUE_USERNAME

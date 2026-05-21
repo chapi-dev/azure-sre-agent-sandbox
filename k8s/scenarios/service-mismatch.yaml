@@ -1,14 +1,16 @@
 # =============================================================================
-# SCENARIO 10: Service Selector Mismatch - Silent Networking Failure
+# Movistar BSS Application (Telefónica demo, rebranded from AKS-store-demo)
 # =============================================================================
-# This scenario replaces the order-service Service with one that has a wrong
-# selector label. The order-service pods are perfectly healthy, but the Service
-# routes to nothing because the selector doesn't match any pods.
+# SCENARIO 10: Service Selector Mismatch - Silent activation failure
+# =============================================================================
+# This scenario replaces the activation-service Service with one that has a
+# wrong selector label. The activation-service pods are perfectly healthy, but
+# the Service routes to nothing because the selector doesn't match any pods.
 #
 # This is a subtle, realistic networking issue:
 # - All pods show Running/Ready (no crashes, no restarts)
-# - store-front loads fine (it's a client-side app)
-# - But placing an order fails silently (order-service unreachable)
+# - customer-portal loads fine (it's a client-side app)
+# - But placing an activation fails silently (activation-service unreachable)
 # - SRE Agent must check Service endpoints, not just pod status
 #
 # SRE Agent can diagnose: Empty endpoints, selector mismatch between Service
@@ -24,17 +26,17 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: order-service
-  namespace: pets
+  name: activation-service
+  namespace: movistar
   labels:
     scenario: service-mismatch
     sre-demo: breakable
 spec:
   selector:
     # BREAKING CHANGE: Selector doesn't match any existing pods
-    # Real pods have label: app=order-service
-    # This selector looks for app=order-service-v2 (doesn't exist)
-    app: order-service-v2
+    # Real pods have label: app=activation-service
+    # This selector looks for app=activation-service-v2 (doesn't exist)
+    app: activation-service-v2
   ports:
     - port: 3000
       targetPort: 3000

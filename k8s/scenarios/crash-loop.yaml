@@ -1,8 +1,10 @@
 # =============================================================================
-# SCENARIO 2: CrashLoopBackOff - Application startup failure
+# Movistar BSS Application (Telefónica demo, rebranded from AKS-store-demo)
 # =============================================================================
-# This scenario causes the product-service to fail on startup, entering
-# a CrashLoopBackOff state.
+# SCENARIO 2: CrashLoopBackOff - Catalog unavailable
+# =============================================================================
+# This scenario causes catalog-service to fail on startup, so customers and
+# agents can't browse plans or offers in the Movistar BSS lab.
 #
 # SRE Agent can diagnose: Pod is in CrashLoopBackOff, container exit code,
 # recommend checking application logs and configuration.
@@ -17,10 +19,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: product-service
-  namespace: pets
+  name: catalog-service
+  namespace: movistar
   labels:
-    app: product-service
+    app: catalog-service
     scenario: crash-loop
     sre-demo: breakable
 spec:
@@ -29,16 +31,16 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: product-service
+      app: catalog-service
   template:
     metadata:
       labels:
-        app: product-service
+        app: catalog-service
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: product-service
+        - name: catalog-service
           image: ghcr.io/azure-samples/aks-store-demo/product-service:latest
           ports:
             - containerPort: 3002
@@ -55,4 +57,4 @@ spec:
               value: "http://nonexistent-service:9999/"
           # BREAKING CHANGE: Command that causes immediate exit
           command: ["/bin/sh"]
-          args: ["-c", "echo 'Starting with invalid config...'; exit 1"]
+          args: ["-c", "echo 'Starting catalog with invalid config...'; exit 1"]

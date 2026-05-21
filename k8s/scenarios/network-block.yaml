@@ -1,8 +1,10 @@
 # =============================================================================
-# SCENARIO 7: Network Policy Blocking - Service Connectivity Issues
+# Movistar BSS Application (Telefónica demo, rebranded from AKS-store-demo)
 # =============================================================================
-# This scenario applies a network policy that blocks all traffic to the
-# order-service, causing connectivity failures.
+# SCENARIO 7: Network Policy Blocking - Customer activations blocked
+# =============================================================================
+# This scenario applies a NetworkPolicy that blocks customer-portal traffic to
+# activation-service, so customers can't place activations or plan changes.
 #
 # SRE Agent can diagnose: Network connectivity issues, service unavailable,
 # recommend checking network policies and firewall rules.
@@ -11,21 +13,21 @@
 # kubectl apply -f k8s/scenarios/network-block.yaml
 #
 # HOW TO FIX:
-# kubectl delete networkpolicy deny-order-service -n pets
+# kubectl delete networkpolicy deny-activation-service -n movistar
 # =============================================================================
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: deny-order-service
-  namespace: pets
+  name: deny-activation-service
+  namespace: movistar
   labels:
     scenario: network-block
     sre-demo: breakable
 spec:
   podSelector:
     matchLabels:
-      app: order-service
+      app: activation-service
   policyTypes:
     - Ingress
     - Egress

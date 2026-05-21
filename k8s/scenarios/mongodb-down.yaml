@@ -1,16 +1,19 @@
 # =============================================================================
-# SCENARIO 9: MongoDB Down - Cascading Dependency Failure
+# Movistar BSS Application (Telefónica demo, rebranded from AKS-store-demo)
 # =============================================================================
-# This scenario scales MongoDB to 0 replicas, simulating a database outage.
-# Since makeline-service depends on MongoDB for order storage, it will start
-# failing health checks and become unavailable. Orders can still be placed
-# (they queue in RabbitMQ) but are never fulfilled.
+# SCENARIO 9: Subscriber DB down - Cascading dependency failure
+# =============================================================================
+# This scenario scales subscriber-db to 0 replicas, simulating a subscriber
+# database outage.
+# Since provisioning-service depends on subscriber-db for order storage, it will
+# start failing health checks and become unavailable. Activations can still be
+# placed (they queue in provisioning-queue) but are never completed.
 #
 # This is the most realistic scenario because it requires SRE Agent to trace
-# the dependency chain: makeline-service → MongoDB → scaled to 0.
+# the dependency chain: provisioning-service → subscriber-db → scaled to 0.
 #
 # SRE Agent can diagnose: Dependency failures, cascading impact, service
-# health correlation, and recommend scaling MongoDB back up.
+# health correlation, and recommend scaling subscriber-db back up.
 #
 # HOW TO BREAK:
 # kubectl apply -f k8s/scenarios/mongodb-down.yaml
@@ -22,11 +25,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mongodb
-  namespace: pets
+  name: subscriber-db
+  namespace: movistar
   labels:
-    app: mongodb
-    scenario: mongodb-down
+    app: subscriber-db
+    scenario: subscriber-db-down
     sre-demo: breakable
 spec:
   # BREAKING CHANGE: Scale to 0 replicas - database goes offline
@@ -35,17 +38,17 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: mongodb
+      app: subscriber-db
   template:
     metadata:
       labels:
-        app: mongodb
-        scenario: mongodb-down
+        app: subscriber-db
+        scenario: subscriber-db-down
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: mongodb
+        - name: subscriber-db
           image: mongo:4.4
           ports:
             - containerPort: 27017
@@ -57,9 +60,9 @@ spec:
               memory: "512Mi"
               cpu: "500m"
           volumeMounts:
-            - name: mongodb-data
+            - name: subscriber-db-data
               mountPath: /data/db
       volumes:
-        - name: mongodb-data
+        - name: subscriber-db-data
           persistentVolumeClaim:
-            claimName: mongodb-data-pvc
+            claimName: subscriber-db-data-pvc

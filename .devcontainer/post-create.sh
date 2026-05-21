@@ -3,12 +3,12 @@
 # Post-Create Script for Dev Container
 # =============================================================================
 # This script runs once when the dev container is created.
-# It sets up the environment for Azure SRE Agent demo development.
+# It sets up the environment for Movistar BSS demo development.
 # =============================================================================
 
 set -e
 
-echo "🔧 Setting up Azure SRE Agent Demo Lab dev container..."
+echo "🔧 Setting up Movistar BSS Demo Lab dev container..."
 
 # Install additional tools
 echo "📦 Installing additional tools..."
@@ -55,11 +55,11 @@ EOF
 echo "📝 Setting up shell aliases..."
 cat >> ~/.bashrc << 'EOF'
 
-# Azure SRE Agent Demo Lab aliases
+# Movistar BSS Demo Lab aliases
 alias k='kubectl'
-alias kgp='kubectl get pods -n pets'
-alias kgs='kubectl get svc -n pets'
-alias kgd='kubectl get deployments -n pets'
+alias kgp='kubectl get pods -n movistar'
+alias kgs='kubectl get svc -n movistar'
+alias kgd='kubectl get deployments -n movistar'
 alias kgn='kubectl get namespaces'
 alias kd='kubectl describe'
 alias kl='kubectl logs'
@@ -90,35 +90,35 @@ alias break-service='kubectl apply -f k8s/scenarios/service-mismatch.yaml'
 
 # Fix commands
 alias fix-all='kubectl apply -f k8s/base/application.yaml'
-alias fix-network='kubectl delete networkpolicy deny-order-service -n pets 2>/dev/null'
-alias fix-extras='kubectl delete deployment cpu-stress-test resource-hog unhealthy-service misconfigured-service -n pets 2>/dev/null'
+alias fix-network='kubectl delete networkpolicy deny-activation-service -n movistar 2>/dev/null'
+alias fix-extras='kubectl delete deployment cpu-stress-test resource-hog unhealthy-service misconfigured-service -n movistar 2>/dev/null'
 
 # Site URL command
-alias site='echo "Store Front: http://$(kubectl get svc store-front -n pets -o jsonpath=\"{.status.loadBalancer.ingress[0].ip}\" 2>/dev/null || echo "pending...")"'
+alias site='echo "Customer Portal: http://$(kubectl get svc customer-portal -n movistar -o jsonpath=\"{.status.loadBalancer.ingress[0].ip}\" 2>/dev/null || echo "pending...")"'
 # SRE Agent portal
 alias sre-agent='echo "SRE Agent Portal: https://aka.ms/sreagent/portal"'
 # Helpful functions
 function kwatch() {
-    kubectl get pods -n ${1:-pets} -w
+    kubectl get pods -n ${1:-movistar} -w
 }
 
 function klogs() {
-    kubectl logs -n ${2:-pets} -l app=$1 -f
+    kubectl logs -n ${2:-movistar} -l app=$1 -f
 }
 EOF
 
 # Same for PowerShell
 mkdir -p ~/.config/powershell
 cat > ~/.config/powershell/Microsoft.PowerShell_profile.ps1 << 'EOF'
-# Azure SRE Agent Demo Lab PowerShell Profile
+# Movistar BSS Demo Lab PowerShell Profile
 
 # Aliases
 Set-Alias -Name k -Value kubectl
 
 # Functions
-function kgp { kubectl get pods -n pets @args }
-function kgs { kubectl get svc -n pets @args }
-function kgd { kubectl get deployments -n pets @args }
+function kgp { kubectl get pods -n movistar @args }
+function kgs { kubectl get svc -n movistar @args }
+function kgd { kubectl get deployments -n movistar @args }
 function kgn { kubectl get namespaces @args }
 
 # Demo commands
@@ -147,14 +147,14 @@ function break-config { kubectl apply -f k8s/scenarios/missing-config.yaml }
 function break-mongodb { kubectl apply -f k8s/scenarios/mongodb-down.yaml }
 function break-service { kubectl apply -f k8s/scenarios/service-mismatch.yaml }
 function fix-all { kubectl apply -f k8s/base/application.yaml }
-function fix-network { kubectl delete networkpolicy deny-order-service -n pets 2>$null }
-function fix-extras { kubectl delete deployment cpu-stress-test resource-hog unhealthy-service misconfigured-service -n pets 2>$null }
+function fix-network { kubectl delete networkpolicy deny-activation-service -n movistar 2>$null }
+function fix-extras { kubectl delete deployment cpu-stress-test resource-hog unhealthy-service misconfigured-service -n movistar 2>$null }
 
 # Site URL command  
 function site { 
-    $ip = kubectl get svc store-front -n pets -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
-    if ($ip) { Write-Host "Store Front: http://$ip" -ForegroundColor Green } 
-    else { Write-Host "Store Front IP not ready yet..." -ForegroundColor Yellow }
+    $ip = kubectl get svc customer-portal -n movistar -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
+    if ($ip) { Write-Host "Customer Portal: http://$ip" -ForegroundColor Green } 
+    else { Write-Host "Customer Portal IP not ready yet..." -ForegroundColor Yellow }
 }
 
 # SRE Agent portal
@@ -167,29 +167,29 @@ function menu {
     Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                    Azure SRE Agent Demo Lab                                   ║
+║                    Movistar BSS Demo Lab                                   ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  Commands:                                                                   ║
 ║    az login --use-device-code  - Login to Azure                              ║
 ║    deploy                      - Deploy the infrastructure                   ║
 ║    destroy                     - Tear down the infrastructure                ║
-║    site                        - Show the store front URL                    ║
+║    site                        - Show the customer portal URL                    ║
 ║    sre-agent                   - Show SRE Agent portal URL                   ║
 ║    menu                        - Show this help menu                         ║
 ║                                                                              ║
-║  Kubernetes Shortcuts (default namespace: pets):                             ║
+║  Kubernetes Shortcuts (default namespace: movistar):                             ║
 ║    kgp, kgs, kgd               - Get pods/services/deployments               ║
 ║                                                                              ║
 ║  Break Scenarios:                                                            ║
-║    break-oom                   - OOMKilled (order-service)                   ║
-║    break-crash                 - CrashLoopBackOff (product-service)          ║
-║    break-image                 - ImagePullBackOff (makeline-service)         ║
+║    break-oom                   - OOMKilled (activation-service)                   ║
+║    break-crash                 - CrashLoopBackOff (catalog-service)          ║
+║    break-image                 - ImagePullBackOff (provisioning-service)         ║
 ║    break-cpu                   - High CPU (new stress pod)                   ║
 ║    break-pending               - Pending pods (insufficient resources)       ║
 ║    break-probe                 - Liveness probe failure                      ║
 ║    break-network               - Network policy blocking                     ║
 ║    break-config                - Missing ConfigMap                           ║
-║    break-mongodb               - MongoDB down (cascading failure)            ║
+║    break-mongodb               - subscriber-db down (cascading failure)            ║
 ║    break-service               - Service selector mismatch                   ║
 ║                                                                              ║
 ║  Fix Commands:                                                               ║

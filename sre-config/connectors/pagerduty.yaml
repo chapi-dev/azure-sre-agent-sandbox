@@ -1,0 +1,22 @@
+# PagerDuty Connector — Dataplane v2 API format
+# Create a PagerDuty API user token from:
+# 1. My Profile
+# 2. User Settings
+# 3. Create API User Token
+# Scope the token only to the services and teams that the demo should manage,
+# then store it in Azure Key Vault instead of keeping it in plaintext.
+api_version: azuresre.ai/v2
+kind: DataConnector
+spec:
+  name: pagerduty
+  dataConnectorType: PagerDuty
+  dataSource: pagerduty
+  authenticationType: BearerToken
+  syncDirection: Bidirectional
+  defaultTeamIds:
+    - YOUR_PAGERDUTY_TEAM_ID
+  defaultServiceIds:
+    - YOUR_PAGERDUTY_SERVICE_ID
+  defaultEscalationPolicyId: YOUR_PAGERDUTY_ESCALATION_POLICY_ID
+  credentials:
+    token: YOUR_PAGERDUTY_API_TOKEN

@@ -1,8 +1,6 @@
-# Pets E-Commerce Application Architecture
+# Movistar BSS Application Architecture
 
-## Overview
-
-The pets e-commerce application is a multi-service application deployed on Azure Kubernetes Service (AKS) in the `pets` namespace. It simulates a pet supplies store with customer-facing ordering, admin management, and automated order fulfillment.
+This Telefonica/Movistar BSS demo lab simulates the lifecycle of plan activations, recharges, and provisioning on Azure Kubernetes Service (AKS). It models a Movistar self-service + provisioning platform in the `movistar` namespace, with subscriber journeys starting in digital channels and ending in OSS-style fulfillment workflows.
 
 ---
 
@@ -10,78 +8,72 @@ The pets e-commerce application is a multi-service application deployed on Azure
 
 | Service | Language | Port | Description |
 |---------|----------|------|-------------|
-| store-front | Vue.js / Node.js | 8080 | Customer web storefront |
-| store-admin | Vue.js / Node.js | 8081 | Admin dashboard |
-| order-service | Go / Node.js | 3000 | Order creation and management API |
-| product-service | Go / Node.js | 3002 | Product catalog API |
-| makeline-service | Go / Node.js | 3001 | Order fulfillment processor |
-| virtual-customer | Node.js | — | Simulates customer traffic placing orders |
-| virtual-worker | Node.js | — | Simulates workers completing orders |
+| customer-portal | Vue.js / Node.js | 8080 | Consumer self-service portal ("Mi Movistar") for browsing plans, activating lines, and recharges |
+| csr-console | Vue.js / Node.js | 8081 | CSR console for assisted care, plan changes, and subscriber troubleshooting |
+| activation-service | Go / Node.js | 3000 | BSS API for activations, plan changes, prepaid top-ups, and subscriber transactions |
+| catalog-service | Go / Node.js | 3002 | Catalog API for plans, bundles, add-ons, and eligibility rules |
+| provisioning-service | Go / Node.js | 3001 | OSS provisioning processor that simulates HLR/HSS and downstream network updates |
+| traffic-simulator | Node.js | — | Simulates subscriber traffic through the self-service journey |
+| network-worker | Node.js | — | Simulates operational workers completing provisioning tasks |
 
 ## Backing Services
 
 | Service | Port | Persistence | Description |
 |---------|------|-------------|-------------|
-| mongodb | 27017 | PersistentVolumeClaim (Azure Managed Disk) | Primary data store for products and orders |
-| rabbitmq | 5672 | In-memory | Message queue for order processing pipeline |
+| subscriber-db | 27017 | PersistentVolumeClaim (Azure Managed Disk) | Subscriber, plan, and activation state store backed by MongoDB (`mongo:6`) |
+| provisioning-queue | 5672 | In-memory | Queue used between activation and provisioning stages, backed by RabbitMQ (`rabbitmq:3.11-management-alpine`) |
 
----
-
-## Service Dependencies
+## Dependencies
 
 ```
 Internet
   │
-  ├──→ store-front (8080) ──→ order-service (3000) ──→ mongodb (27017)
-  │         │                       │
-  │         │                       └──→ rabbitmq (5672)
+  ├──→ customer-portal (8080) ──→ activation-service (3000) ──→ subscriber-db (27017)
+  │         │                             │
+  │         │                             └──→ provisioning-queue (5672)
   │         │
-  │         └──→ product-service (3002) ──→ mongodb (27017)
+  │         └──→ catalog-service (3002) ──→ subscriber-db (27017)
   │
-  ├──→ store-admin (8081) ──→ order-service, product-service, makeline-service
+  ├──→ csr-console (8081) ──→ activation-service, catalog-service, provisioning-service
   │
-  │    makeline-service (3001) ──→ rabbitmq (5672) ──→ mongodb (27017)
+  │    activation-service (3000) ──→ provisioning-queue (5672) ──→ provisioning-service (3001) ──→ subscriber-db (27017)
   │
-  │    virtual-customer ──→ store-front
-  └──  virtual-worker ──→ makeline-service
+  │    traffic-simulator ──→ customer-portal
+  └──  network-worker ──→ provisioning-service
 ```
-
----
 
 ## Kubernetes Resources
 
-All resources are deployed in the `pets` namespace.
+All resources are deployed in the `movistar` namespace.
 
 ### Deployments
-- `mongodb` — 1 replica, attached to `mongodb-data-pvc`
-- `rabbitmq` — 1 replica, in-memory
-- `product-service` — 1 replica
-- `order-service` — 1 replica
-- `makeline-service` — 1 replica
-- `store-front` — 1 replica, type LoadBalancer (external)
-- `store-admin` — 1 replica
-- `virtual-customer` — 1 replica
-- `virtual-worker` — 1 replica
+- `subscriber-db` — 1 replica, attached to `mongodb-data-pvc`
+- `provisioning-queue` — 1 replica, in-memory
+- `catalog-service` — 1 replica
+- `activation-service` — 1 replica
+- `provisioning-service` — 1 replica
+- `customer-portal` — 1 replica, type LoadBalancer (external)
+- `csr-console` — 1 replica
+- `traffic-simulator` — 1 replica
+- `network-worker` — 1 replica
 
 ### Services
-- `mongodb` — ClusterIP on port 27017
-- `rabbitmq` — ClusterIP on port 5672 (AMQP) and 15672 (Management)
-- `product-service` — ClusterIP on port 3002
-- `order-service` — ClusterIP on port 3000
-- `makeline-service` — ClusterIP on port 3001
-- `store-front` — LoadBalancer on port 80 → 8080
-- `store-admin` — ClusterIP on port 80 → 8081
+- `subscriber-db` — ClusterIP on port 27017
+- `provisioning-queue` — ClusterIP on port 5672 (AMQP) and 15672 (Management)
+- `catalog-service` — ClusterIP on port 3002
+- `activation-service` — ClusterIP on port 3000
+- `provisioning-service` — ClusterIP on port 3001
+- `customer-portal` — LoadBalancer on port 80 → 8080
+- `csr-console` — ClusterIP on port 80 → 8081
 
 ### Storage
-- `mongodb-data-pvc` — PersistentVolumeClaim using `managed-csi` StorageClass (Azure Managed Disk)
-
----
+- `mongodb-data-pvc` — PersistentVolumeClaim using `managed-csi` StorageClass (Azure Managed Disk) for `subscriber-db`
 
 ## Azure Infrastructure
 
 | Component | Azure Service | Purpose |
 |-----------|--------------|---------|
-| Compute | Azure Kubernetes Service (AKS) | Container orchestration |
+| Compute | Azure Kubernetes Service (AKS) | Container orchestration for the Movistar BSS lab |
 | Registry | Azure Container Registry | Container image storage |
 | Secrets | Azure Key Vault | Secrets management |
 | Logs | Log Analytics Workspace | Centralized log storage |
@@ -90,26 +82,22 @@ All resources are deployed in the `pets` namespace.
 | Metrics | Azure Monitor Workspace | Prometheus metrics |
 | SRE | Azure SRE Agent | AI-powered diagnostics |
 
----
-
 ## Common Failure Modes
 
 | Failure | Impact | Detection |
 |---------|--------|-----------|
-| MongoDB scaled to 0 | All data-dependent services fail | product-service/order-service health checks fail |
-| RabbitMQ down | Orders accepted but never fulfilled | makeline-service has nothing to process |
-| OOMKilled on any service | Pod restarts, request failures | Pod restart count increases, OOMKilled events |
-| Network policy blocking order-service | Orders fail, front-end errors | Connection timeout between store-front and order-service |
-| Service selector mismatch | Silent failure, zero endpoints | Service has 0 endpoints despite healthy pods |
-| Wrong image tag | Pod stuck in ImagePullBackOff | Kubelet events show image pull errors |
-| Missing ConfigMap | Pod won't start | CreateContainerConfigError |
-| CPU stress workload | All pods degraded | High CPU across nodes |
-| Probe misconfiguration | Unnecessary restarts | Readiness/liveness probe events |
-| Oversized resource requests | Pods stuck in Pending | Scheduler events show insufficient resources |
+| subscriber-db scaled to 0 | Subscriber and activation state lookups fail | catalog-service/activation-service/provisioning-service health checks fail |
+| provisioning-queue down | Activations are accepted but provisioning never starts | provisioning-service has nothing to process |
+| OOMKilled on activation-service | Pod restarts, activations and top-ups fail | Pod restart count increases, OOMKilled events |
+| Network policy blocking activation-service | Activations fail, portal errors surface to subscribers | Connection timeout between customer-portal and activation-service |
+| Service selector mismatch on activation-service | Silent failure, zero endpoints | Service has 0 endpoints despite healthy pods |
+| Wrong image tag on provisioning-service | Pod stuck in ImagePullBackOff | Kubelet events show image pull errors |
+| Missing ConfigMap on csr-console | CSR tooling will not start | CreateContainerConfigError |
+| CPU stress workload | All BSS flows degrade | High CPU across nodes |
+| Probe misconfiguration on customer-portal | Unnecessary restarts and false health alarms | Readiness/liveness probe events |
+| Oversized resource requests | New pods stuck in Pending | Scheduler events show insufficient resources |
 
----
-
-## Monitoring & Alerting
+## Monitoring
 
 ### Log Analytics Queries
 
@@ -117,7 +105,7 @@ All resources are deployed in the `pets` namespace.
 ```kql
 ContainerLogV2
 | where TimeGenerated > ago(1h)
-| where PodNamespace == "pets"
+| where PodNamespace == "movistar"
 | where LogMessage contains "error" or LogMessage contains "Error"
 | summarize ErrorCount = count() by PodName, bin(TimeGenerated, 5m)
 | order by TimeGenerated desc
@@ -127,7 +115,7 @@ ContainerLogV2
 ```kql
 KubePodInventory
 | where TimeGenerated > ago(24h)
-| where Namespace == "pets"
+| where Namespace == "movistar"
 | where PodRestartCount > 0
 | summarize MaxRestarts = max(PodRestartCount) by Name, bin(TimeGenerated, 1h)
 | order by MaxRestarts desc

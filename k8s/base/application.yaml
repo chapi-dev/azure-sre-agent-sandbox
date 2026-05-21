@@ -1,58 +1,57 @@
 # =============================================================================
-# AKS Store Demo - Base Application Deployment
+# Movistar BSS Application (Telefónica demo, rebranded from AKS-store-demo)
 # =============================================================================
-# This is the healthy baseline deployment of the AKS Store Demo application.
-# Based on Azure-Samples/aks-store-demo
+# This is the healthy baseline deployment of the Movistar BSS Demo Lab.
+# Based on Azure-Samples/aks-store-demo with Telefónica/Movistar service naming.
 #
 # Architecture:
-# - store-front: Vue.js customer-facing website
-# - store-admin: Vue.js admin panel
-# - order-service: Node.js order processing
-# - product-service: Rust-based product catalog
-# - makeline-service: Go order fulfillment
+# - customer-portal: "Mi Movistar" self-service portal
+# - csr-console: Customer Service Rep back-office console
+# - activation-service: altas, plan changes, top-ups, and porting workflows
+# - catalog-service: plan and product catalog
+# - provisioning-service: OSS/HLR/HSS provisioning simulator
 # - ai-service: Python AI recommendations (optional)
-# - virtual-customer: Load generator
-# - virtual-worker: Order processor simulator
+# - traffic-simulator: simulated customer browsing and ordering
+# - network-worker: simulated OSS worker completing provisioning
 #
 # Data Services (in-cluster):
-# - rabbitmq: Message queue
-# - mongodb: Database
+# - provisioning-queue: RabbitMQ-backed provisioning queue
+# - subscriber-db: subscriber database
 # =============================================================================
-
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: pets
+  name: movistar
   labels:
-    app.kubernetes.io/part-of: aks-store-demo
+    app.kubernetes.io/part-of: movistar-bss
     sre-agent-demo: "true"
 
 ---
 # =============================================================================
-# RabbitMQ - Message Queue
+# Provisioning Queue - RabbitMQ
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: rabbitmq
-  namespace: pets
+  name: provisioning-queue
+  namespace: movistar
   labels:
-    app: rabbitmq
+    app: provisioning-queue
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: rabbitmq
+      app: provisioning-queue
   template:
     metadata:
       labels:
-        app: rabbitmq
+        app: provisioning-queue
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: rabbitmq
+        - name: provisioning-queue
           image: rabbitmq:3.11-management-alpine
           ports:
             - containerPort: 5672
@@ -90,11 +89,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: rabbitmq
-  namespace: pets
+  name: provisioning-queue
+  namespace: movistar
 spec:
   selector:
-    app: rabbitmq
+    app: provisioning-queue
   ports:
     - name: amqp
       port: 5672
@@ -105,15 +104,15 @@ spec:
 
 ---
 # =============================================================================
-# MongoDB - Database Storage (Azure Managed Disk via CSI driver)
+# Subscriber DB - Database Storage (Azure Managed Disk via CSI driver)
 # =============================================================================
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: mongodb-data-pvc
-  namespace: pets
+  name: subscriber-db-data-pvc
+  namespace: movistar
   labels:
-    app: mongodb
+    app: subscriber-db
 spec:
   accessModes:
     - ReadWriteOnce
@@ -124,29 +123,29 @@ spec:
 
 ---
 # =============================================================================
-# MongoDB - Database
+# Subscriber DB - Database
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mongodb
-  namespace: pets
+  name: subscriber-db
+  namespace: movistar
   labels:
-    app: mongodb
+    app: subscriber-db
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mongodb
+      app: subscriber-db
   template:
     metadata:
       labels:
-        app: mongodb
+        app: subscriber-db
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: mongodb
+        - name: subscriber-db
           image: mongo:4.4
           ports:
             - containerPort: 27017
@@ -158,51 +157,51 @@ spec:
               memory: "512Mi"
               cpu: "500m"
           volumeMounts:
-            - name: mongodb-data
+            - name: subscriber-db-data
               mountPath: /data/db
       volumes:
-        - name: mongodb-data
+        - name: subscriber-db-data
           persistentVolumeClaim:
-            claimName: mongodb-data-pvc
+            claimName: subscriber-db-data-pvc
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: mongodb
-  namespace: pets
+  name: subscriber-db
+  namespace: movistar
 spec:
   selector:
-    app: mongodb
+    app: subscriber-db
   ports:
     - port: 27017
       targetPort: 27017
 
 ---
 # =============================================================================
-# Product Service - Rust-based product catalog API
+# Catalog Service - Rust-based plan catalog API
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: product-service
-  namespace: pets
+  name: catalog-service
+  namespace: movistar
   labels:
-    app: product-service
+    app: catalog-service
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: product-service
+      app: catalog-service
   template:
     metadata:
       labels:
-        app: product-service
+        app: catalog-service
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: product-service
+        - name: catalog-service
           image: ghcr.io/azure-samples/aks-store-demo/product-service:latest
           ports:
             - containerPort: 3002
@@ -233,40 +232,40 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: product-service
-  namespace: pets
+  name: catalog-service
+  namespace: movistar
 spec:
   selector:
-    app: product-service
+    app: catalog-service
   ports:
     - port: 3002
       targetPort: 3002
 
 ---
 # =============================================================================
-# Order Service - Node.js order processing API
+# Activation Service - Node.js activation workflow API
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: order-service
-  namespace: pets
+  name: activation-service
+  namespace: movistar
   labels:
-    app: order-service
+    app: activation-service
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: order-service
+      app: activation-service
   template:
     metadata:
       labels:
-        app: order-service
+        app: activation-service
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: order-service
+        - name: activation-service
           image: ghcr.io/azure-samples/aks-store-demo/order-service:latest
           ports:
             - containerPort: 3000
@@ -279,7 +278,7 @@ spec:
               cpu: "200m"
           env:
             - name: ORDER_QUEUE_HOSTNAME
-              value: "rabbitmq"
+              value: "provisioning-queue"
             - name: ORDER_QUEUE_PORT
               value: "5672"
             - name: ORDER_QUEUE_USERNAME
@@ -307,40 +306,40 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: order-service
-  namespace: pets
+  name: activation-service
+  namespace: movistar
 spec:
   selector:
-    app: order-service
+    app: activation-service
   ports:
     - port: 3000
       targetPort: 3000
 
 ---
 # =============================================================================
-# Makeline Service - Go order fulfillment processor
+# Provisioning Service - Go OSS provisioning processor
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: makeline-service
-  namespace: pets
+  name: provisioning-service
+  namespace: movistar
   labels:
-    app: makeline-service
+    app: provisioning-service
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: makeline-service
+      app: provisioning-service
   template:
     metadata:
       labels:
-        app: makeline-service
+        app: provisioning-service
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: makeline-service
+        - name: provisioning-service
           image: ghcr.io/azure-samples/aks-store-demo/makeline-service:latest
           ports:
             - containerPort: 3001
@@ -353,7 +352,7 @@ spec:
               cpu: "100m"
           env:
             - name: ORDER_QUEUE_URI
-              value: "amqp://guest:guest@rabbitmq:5672/"
+              value: "amqp://guest:guest@provisioning-queue:5672/"
             - name: ORDER_QUEUE_USERNAME
               value: "guest"
             - name: ORDER_QUEUE_PASSWORD
@@ -361,7 +360,7 @@ spec:
             - name: ORDER_QUEUE_NAME
               value: "orders"
             - name: ORDER_DB_URI
-              value: "mongodb://mongodb:27017"
+              value: "mongodb://subscriber-db:27017"
             - name: ORDER_DB_NAME
               value: "orderdb"
             - name: ORDER_DB_COLLECTION_NAME
@@ -383,40 +382,40 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: makeline-service
-  namespace: pets
+  name: provisioning-service
+  namespace: movistar
 spec:
   selector:
-    app: makeline-service
+    app: provisioning-service
   ports:
     - port: 3001
       targetPort: 3001
 
 ---
 # =============================================================================
-# Store Front - Vue.js customer website
+# Customer Portal - "Mi Movistar" self-service web UI
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: store-front
-  namespace: pets
+  name: customer-portal
+  namespace: movistar
   labels:
-    app: store-front
+    app: customer-portal
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: store-front
+      app: customer-portal
   template:
     metadata:
       labels:
-        app: store-front
+        app: customer-portal
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: store-front
+        - name: customer-portal
           image: ghcr.io/azure-samples/aks-store-demo/store-front:latest
           ports:
             - containerPort: 8080
@@ -429,9 +428,9 @@ spec:
               cpu: "100m"
           env:
             - name: VUE_APP_ORDER_SERVICE_URL
-              value: "http://order-service:3000/"
+              value: "http://activation-service:3000/"
             - name: VUE_APP_PRODUCT_SERVICE_URL
-              value: "http://product-service:3002/"
+              value: "http://catalog-service:3002/"
           livenessProbe:
             httpGet:
               path: /health
@@ -449,41 +448,41 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: store-front
-  namespace: pets
+  name: customer-portal
+  namespace: movistar
 spec:
   type: LoadBalancer
   selector:
-    app: store-front
+    app: customer-portal
   ports:
     - port: 80
       targetPort: 8080
 
 ---
 # =============================================================================
-# Store Admin - Vue.js admin panel
+# CSR Console - back-office web UI
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: store-admin
-  namespace: pets
+  name: csr-console
+  namespace: movistar
   labels:
-    app: store-admin
+    app: csr-console
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: store-admin
+      app: csr-console
   template:
     metadata:
       labels:
-        app: store-admin
+        app: csr-console
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: store-admin
+        - name: csr-console
           image: ghcr.io/azure-samples/aks-store-demo/store-admin:latest
           ports:
             - containerPort: 8081
@@ -496,9 +495,9 @@ spec:
               cpu: "100m"
           env:
             - name: VUE_APP_PRODUCT_SERVICE_URL
-              value: "http://product-service:3002/"
+              value: "http://catalog-service:3002/"
             - name: VUE_APP_MAKELINE_SERVICE_URL
-              value: "http://makeline-service:3001/"
+              value: "http://provisioning-service:3001/"
           livenessProbe:
             httpGet:
               path: /health
@@ -516,41 +515,41 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: store-admin
-  namespace: pets
+  name: csr-console
+  namespace: movistar
 spec:
   type: LoadBalancer
   selector:
-    app: store-admin
+    app: csr-console
   ports:
     - port: 80
       targetPort: 8081
 
 ---
 # =============================================================================
-# Virtual Customer - Load generator for testing
+# Traffic Simulator - load generator for self-service traffic
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: virtual-customer
-  namespace: pets
+  name: traffic-simulator
+  namespace: movistar
   labels:
-    app: virtual-customer
+    app: traffic-simulator
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: virtual-customer
+      app: traffic-simulator
   template:
     metadata:
       labels:
-        app: virtual-customer
+        app: traffic-simulator
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: virtual-customer
+        - name: traffic-simulator
           image: ghcr.io/azure-samples/aks-store-demo/virtual-customer:latest
           resources:
             requests:
@@ -561,35 +560,35 @@ spec:
               cpu: "50m"
           env:
             - name: ORDER_SERVICE_URL
-              value: "http://order-service:3000/"
+              value: "http://activation-service:3000/"
             - name: ORDERS_PER_HOUR
               value: "100"
 
 ---
 # =============================================================================
-# Virtual Worker - Order processor simulator (disabled by default due to AMQP compatibility)
+# Network Worker - provisioning simulator (disabled by default due to AMQP compatibility)
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: virtual-worker
-  namespace: pets
+  name: network-worker
+  namespace: movistar
   labels:
-    app: virtual-worker
+    app: network-worker
 spec:
   replicas: 0 # Disabled: AMQP protocol mismatch with RabbitMQ 3.11
   selector:
     matchLabels:
-      app: virtual-worker
+      app: network-worker
   template:
     metadata:
       labels:
-        app: virtual-worker
+        app: network-worker
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: virtual-worker
+        - name: network-worker
           image: ghcr.io/azure-samples/aks-store-demo/virtual-worker:latest
           resources:
             requests:
@@ -600,6 +599,6 @@ spec:
               cpu: "50m"
           env:
             - name: MAKELINE_SERVICE_URL
-              value: "http://makeline-service:3001"
+              value: "http://provisioning-service:3001"
             - name: ORDERS_PER_HOUR
               value: "100"

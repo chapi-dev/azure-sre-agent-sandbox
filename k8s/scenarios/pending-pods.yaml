@@ -1,8 +1,10 @@
 # =============================================================================
-# SCENARIO 5: Pending Pods - Insufficient Resources
+# Movistar BSS Application (Telefónica demo, rebranded from AKS-store-demo)
 # =============================================================================
-# This scenario creates pods with resource requests that cannot be satisfied,
-# leaving them in a Pending state.
+# SCENARIO 5: Pending Pods - Capacity exhausted
+# =============================================================================
+# This scenario makes new provisioning-service pods request far more capacity
+# than the cluster can provide, leaving them Pending.
 #
 # SRE Agent can diagnose: Pods pending due to insufficient resources,
 # recommend scaling the cluster or reducing resource requests.
@@ -11,33 +13,33 @@
 # kubectl apply -f k8s/scenarios/pending-pods.yaml
 #
 # HOW TO FIX:
-# kubectl delete deployment resource-hog -n pets
+# kubectl apply -f k8s/base/application.yaml
 # =============================================================================
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: resource-hog
-  namespace: pets
+  name: provisioning-service
+  namespace: movistar
   labels:
-    app: resource-hog
+    app: provisioning-service
     scenario: pending-pods
     sre-demo: breakable
 spec:
   replicas: 5
   selector:
     matchLabels:
-      app: resource-hog
+      app: provisioning-service
   template:
     metadata:
       labels:
-        app: resource-hog
+        app: provisioning-service
         scenario: pending-pods
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: resource-hog
+        - name: provisioning-service
           image: mcr.microsoft.com/mirror/docker/library/nginx:alpine
           resources:
             # BREAKING CHANGE: Requesting more resources than available

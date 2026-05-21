@@ -1,7 +1,10 @@
 # =============================================================================
-# SCENARIO 8: ConfigMap Misconfiguration - Missing Configuration
+# Movistar BSS Application (Telefónica demo, rebranded from AKS-store-demo)
 # =============================================================================
-# This scenario references a non-existent ConfigMap, preventing pod startup.
+# SCENARIO 8: ConfigMap Misconfiguration - CSR console misconfigured
+# =============================================================================
+# This scenario makes csr-console reference a non-existent ConfigMap,
+# preventing the workload from starting.
 #
 # SRE Agent can diagnose: Pod failing to start due to missing ConfigMap,
 # recommend creating the required ConfigMap or fixing the reference.
@@ -10,33 +13,33 @@
 # kubectl apply -f k8s/scenarios/missing-config.yaml
 #
 # HOW TO FIX:
-# kubectl delete deployment misconfigured-service -n pets
+# kubectl apply -f k8s/base/application.yaml
 # =============================================================================
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: misconfigured-service
-  namespace: pets
+  name: csr-console
+  namespace: movistar
   labels:
-    app: misconfigured-service
+    app: csr-console
     scenario: missing-config
     sre-demo: breakable
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: misconfigured-service
+      app: csr-console
   template:
     metadata:
       labels:
-        app: misconfigured-service
+        app: csr-console
         scenario: missing-config
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: app
+        - name: csr-console
           image: mcr.microsoft.com/mirror/docker/library/nginx:alpine
           ports:
             - containerPort: 80
@@ -50,7 +53,7 @@ spec:
           # BREAKING CHANGE: Reference to non-existent ConfigMap
           envFrom:
             - configMapRef:
-                name: nonexistent-configmap
+                name: unhealthy-csr-config
           volumeMounts:
             - name: config-volume
               mountPath: /etc/config
@@ -58,4 +61,4 @@ spec:
         # BREAKING CHANGE: Reference to non-existent ConfigMap
         - name: config-volume
           configMap:
-            name: another-nonexistent-configmap
+            name: unhealthy-csr-config

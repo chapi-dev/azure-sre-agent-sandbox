@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Deploys the Azure SRE Agent Demo Lab infrastructure using Bicep.
+    Deploys the Movistar BSS Demo Lab infrastructure using Bicep.
 
 .DESCRIPTION
     This script deploys all Azure infrastructure needed for the SRE Agent demo,
@@ -31,7 +31,7 @@
     .\deploy.ps1 -Location eastus2 -WhatIf
 
 .NOTES
-    Author: Azure SRE Agent Demo Lab
+    Author: Movistar BSS Demo Lab
     Prerequisites: Azure CLI, Bicep CLI
 #>
 
@@ -55,10 +55,152 @@ param(
     [switch]$WhatIf,
 
     [Parameter()]
-    [switch]$Yes
+    [switch]$Yes,
+
+    [Parameter()]
+    [switch]$DeployMultiStack,
+
+    [Parameter()]
+    [switch]$DeployAvd,
+
+    [Parameter()]
+    [switch]$DeployCitrixMcp,
+
+    [Parameter()]
+    [switch]$DeploySkillsAndHooks,
+
+    [Parameter()]
+    [switch]$DeployEnterprise,
+
+    [Parameter()]
+    [switch]$DeployGovernance,
+
+    [Parameter()]
+    [switch]$DeployAll,
+
+    [Parameter()]
+    [string]$AdminUsername = 'srelab-admin',
+
+    [Parameter()]
+    [SecureString]$AdminPassword,
+
+    [Parameter()]
+    [string]$CitrixCustomerId = '',
+
+    [Parameter()]
+    [string]$CitrixClientId = '',
+
+    [Parameter()]
+    [SecureString]$CitrixClientSecret,
+
+    [Parameter()]
+    [SecureString]$McpBearerToken,
+
+    [Parameter()]
+    [string]$ServiceNowUrl = '',
+
+    [Parameter()]
+    [string]$ServiceNowClientId = '',
+
+    [Parameter()]
+    [SecureString]$ServiceNowClientSecret,
+
+    [Parameter()]
+    [SecureString]$PagerDutyToken,
+
+    [Parameter()]
+    [string]$GrafanaMcpUrl = '',
+
+    [Parameter()]
+    [SecureString]$GrafanaToken,
+
+    [Parameter()]
+    [string]$AzureDevOpsOrgUrl = '',
+
+    [Parameter()]
+    [string]$AzureDevOpsProject = '',
+
+    [Parameter()]
+    [SecureString]$AzureDevOpsPat,
+
+    [Parameter()]
+    [SecureString]$TeamsWebhookUrl,
+
+    [Parameter()]
+    [SecureString]$DatadogApiKey,
+
+    [Parameter()]
+    [SecureString]$DatadogAppKey
 )
 
 $ErrorActionPreference = 'Stop'
+
+function ConvertTo-PlainText {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [SecureString]$SecureValue
+    )
+
+    if (-not $SecureValue) {
+        return ''
+    }
+
+    return ConvertFrom-SecureString $SecureValue -AsPlainText
+}
+
+function ConvertTo-LowercaseBoolean {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [bool]$Value
+    )
+
+    return $Value.ToString().ToLowerInvariant()
+}
+
+function Get-OutputValue {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        $Outputs,
+
+        [Parameter()]
+        [string[]]$CandidateNames = @(),
+
+        [Parameter()]
+        [string[]]$RegexPatterns = @()
+    )
+
+    if (-not $Outputs) {
+        return ''
+    }
+
+    $propertyNames = @($Outputs.PSObject.Properties.Name)
+
+    foreach ($candidateName in $CandidateNames) {
+        if ($propertyNames -contains $candidateName) {
+            $candidate = $Outputs.$candidateName
+            $value = if ($candidate -and $candidate.PSObject.Properties.Name -contains 'value') { $candidate.value } else { $candidate }
+            if (-not [string]::IsNullOrWhiteSpace([string]$value)) {
+                return [string]$value
+            }
+        }
+    }
+
+    foreach ($pattern in $RegexPatterns) {
+        $matchedName = $propertyNames | Where-Object { $_ -match $pattern } | Select-Object -First 1
+        if ($matchedName) {
+            $candidate = $Outputs.$matchedName
+            $value = if ($candidate -and $candidate.PSObject.Properties.Name -contains 'value') { $candidate.value } else { $candidate }
+            if (-not [string]::IsNullOrWhiteSpace([string]$value)) {
+                return [string]$value
+            }
+        }
+    }
+
+    return ''
+}
 
 function Invoke-AzCliJson {
     [CmdletBinding()]
@@ -396,10 +538,10 @@ function Get-SreAgentProviderStatus {
 Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                    Azure SRE Agent Demo Lab Deployment                       ║
+║                    Movistar BSS Demo Lab Deployment                       ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  This script deploys:                                                        ║
-║  • Azure Kubernetes Service (AKS) with multi-service demo app               ║
+║  • Azure Kubernetes Service (AKS) with Movistar BSS demo app               ║
 ║  • Azure Container Registry                                                  ║
 ║  • Observability stack (Log Analytics, App Insights, Grafana)               ║
 ║  • Key Vault for secrets management                                         ║
@@ -407,6 +549,38 @@ Write-Host @"
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 "@ -ForegroundColor Cyan
+
+if ($DeployAll) {
+    $DeployMultiStack = $true
+    $DeployAvd = $true
+    $DeployCitrixMcp = $true
+    $DeploySkillsAndHooks = $true
+    $DeployEnterprise = $true
+    $DeployGovernance = $true
+}
+
+if (([bool]$DeployMultiStack -or [bool]$DeployAvd) -and -not $AdminPassword) {
+    Write-Error 'The -DeployMultiStack and -DeployAvd options require -AdminPassword.'
+    exit 1
+}
+
+if ([bool]$DeployCitrixMcp) {
+    if ([string]::IsNullOrWhiteSpace($CitrixCustomerId) -or [string]::IsNullOrWhiteSpace($CitrixClientId) -or -not $CitrixClientSecret) {
+        Write-Error 'The -DeployCitrixMcp option requires -CitrixCustomerId, -CitrixClientId, and -CitrixClientSecret.'
+        exit 1
+    }
+}
+
+$adminPasswordPlainText = ConvertTo-PlainText -SecureValue $AdminPassword
+$citrixClientSecretPlainText = ConvertTo-PlainText -SecureValue $CitrixClientSecret
+$mcpBearerTokenValue = if ($McpBearerToken) { ConvertTo-PlainText -SecureValue $McpBearerToken } else { [guid]::NewGuid().ToString() }
+$serviceNowClientSecretPlainText = ConvertTo-PlainText -SecureValue $ServiceNowClientSecret
+$pagerDutyTokenPlainText = ConvertTo-PlainText -SecureValue $PagerDutyToken
+$grafanaTokenPlainText = ConvertTo-PlainText -SecureValue $GrafanaToken
+$azureDevOpsPatPlainText = ConvertTo-PlainText -SecureValue $AzureDevOpsPat
+$teamsWebhookUrlPlainText = ConvertTo-PlainText -SecureValue $TeamsWebhookUrl
+$datadogApiKeyPlainText = ConvertTo-PlainText -SecureValue $DatadogApiKey
+$datadogAppKeyPlainText = ConvertTo-PlainText -SecureValue $DatadogAppKey
 
 # Verify prerequisites
 Write-Host "🔍 Checking prerequisites..." -ForegroundColor Yellow
@@ -505,12 +679,59 @@ $deploymentName = "sre-demo-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
 $bicepFile = Join-Path $PSScriptRoot "..\infra\bicep\main.bicep"
 $parametersFile = Join-Path $PSScriptRoot "..\infra\bicep\main.bicepparam"
 
+if ($adminPasswordPlainText) {
+    $env:SRELAB_ADMIN_PASSWORD = $adminPasswordPlainText
+}
+
+if ($citrixClientSecretPlainText) {
+    $env:SRELAB_CITRIX_CLIENT_SECRET = $citrixClientSecretPlainText
+}
+
+if ([bool]$DeployCitrixMcp -or $McpBearerToken) {
+    $env:SRELAB_MCP_BEARER_TOKEN = $mcpBearerTokenValue
+}
+
+$deploymentParameters = @(
+    "`"$parametersFile`"",
+    "location=$Location",
+    "workloadName=$WorkloadName",
+    "deploySreAgent=$deploySreAgentValue",
+    "deployMultiStack=$(ConvertTo-LowercaseBoolean -Value ([bool]$DeployMultiStack))",
+    "deployAvd=$(ConvertTo-LowercaseBoolean -Value ([bool]$DeployAvd))",
+    "deployCitrixMcp=$(ConvertTo-LowercaseBoolean -Value ([bool]$DeployCitrixMcp))",
+    "deploySkillsAndHooks=$(ConvertTo-LowercaseBoolean -Value ([bool]$DeploySkillsAndHooks))",
+    "deployGovernance=$(ConvertTo-LowercaseBoolean -Value ([bool]$DeployGovernance))",
+    "adminUsername=$AdminUsername"
+)
+
+if (-not [string]::IsNullOrWhiteSpace($CitrixCustomerId)) {
+    $deploymentParameters += "citrixCustomerId=$CitrixCustomerId"
+}
+
+if (-not [string]::IsNullOrWhiteSpace($CitrixClientId)) {
+    $deploymentParameters += "citrixClientId=$CitrixClientId"
+}
+
+$deploymentParametersString = $deploymentParameters -join ' '
+
 Write-Host "`n📦 Deployment Configuration:" -ForegroundColor Cyan
 Write-Host "  • Location:        $Location" -ForegroundColor White
 Write-Host "  • Workload Name:   $WorkloadName" -ForegroundColor White
 Write-Host "  • Resource Group:  $resourceGroupName" -ForegroundColor White
 Write-Host "  • Deployment Name: $deploymentName" -ForegroundColor White
 Write-Host "  • SRE Agent:       $(if ($deploySreAgent) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
+Write-Host "  • Multi-stack:     $(if ($DeployMultiStack) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
+Write-Host "  • AVD:             $(if ($DeployAvd) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
+Write-Host "  • Citrix MCP:      $(if ($DeployCitrixMcp) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
+Write-Host "  • Skills/Hooks:    $(if ($DeploySkillsAndHooks) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
+Write-Host "  • Enterprise:      $(if ($DeployEnterprise) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
+Write-Host "  • Governance:      $(if ($DeployGovernance) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
+if ($DeployAvd -or $DeployMultiStack) {
+    Write-Host "  • Admin Username:  $AdminUsername" -ForegroundColor White
+}
+if ($DeployCitrixMcp) {
+    Write-Host "  • MCP Token:       $(if ($McpBearerToken) { 'Provided' } else { 'Generated' })" -ForegroundColor Gray
+}
 if ($sreAgentSkipReason) {
     Write-Host "  • SRE Agent Note:  $sreAgentSkipReason" -ForegroundColor Gray
 }
@@ -520,11 +741,14 @@ Write-Host "`n🔍 Validating Bicep template..." -ForegroundColor Yellow
 
 if ($WhatIf) {
     Write-Host "  Running what-if analysis..." -ForegroundColor Gray
-    $whatIfOutput = az deployment sub what-if `
-        --location $Location `
-        --template-file $bicepFile `
-        --parameters location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue `
-        --name $deploymentName 2>&1 | Out-String
+    $whatIfCmd = @(
+        "az deployment sub what-if",
+        "--location $Location",
+        "--template-file `"$bicepFile`"",
+        "--parameters $deploymentParametersString",
+        "--name $deploymentName"
+    ) -join ' '
+    $whatIfOutput = Invoke-Expression $whatIfCmd 2>&1 | Out-String
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host $whatIfOutput.Trim() -ForegroundColor Red
@@ -546,12 +770,16 @@ Write-Host "  This will take approximately 15-25 minutes." -ForegroundColor Gray
 
 $startTime = Get-Date
 
+$mockCmdbUrl = ''
+$mockCmdbKey = ''
+$citrixMcpUrl = ''
+
 try {
     $createCmd = @(
         "az deployment sub create",
         "--location $Location",
         "--template-file `"$bicepFile`"",
-        "--parameters `"$parametersFile`" location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue",
+        "--parameters $deploymentParametersString",
         "--name $deploymentName",
         "--only-show-errors",
         "--output json"
@@ -653,6 +881,10 @@ try {
     $deployment.properties.outputs | ConvertTo-Json -Depth 10 | Set-Content $outputsFile
     Write-Host "`n  📄 Outputs saved to: $outputsFile" -ForegroundColor Gray
 
+    $mockCmdbUrl = Get-OutputValue -Outputs $outputs -CandidateNames @('mockCmdbUrl', 'mockCmdbBaseUrl', 'mockCmdbFunctionUrl', 'mockCmdbFunctionAppUrl') -RegexPatterns @('(?i)cmdb.*(url|uri|endpoint)')
+    $mockCmdbKey = Get-OutputValue -Outputs $outputs -CandidateNames @('mockCmdbKey', 'mockCmdbFunctionKey', 'mockCmdbDefaultKey', 'mockCmdbFunctionDefaultKey') -RegexPatterns @('(?i)cmdb.*(key|token)')
+    $citrixMcpUrl = Get-OutputValue -Outputs $outputs -CandidateNames @('citrixMcpUrl', 'citrixMcpEndpoint', 'citrixMcpIngressUrl', 'citrixMcpFqdn') -RegexPatterns @('(?i)citrix.*mcp.*(url|uri|endpoint|fqdn)')
+
 }
 catch {
     Write-Host "`n❌ Deployment failed!" -ForegroundColor Red
@@ -701,34 +933,34 @@ if (-not $SkipRbac) {
 }
 
 # Deploy application
-Write-Host "`n📦 Deploying demo application to AKS..." -ForegroundColor Yellow
+Write-Host "`n📦 Deploying Movistar BSS application to AKS..." -ForegroundColor Yellow
 $k8sPath = Join-Path $PSScriptRoot "..\k8s\base\application.yaml"
 
 if (Test-Path $k8sPath) {
     kubectl apply -f $k8sPath
-    Write-Host "  ✅ Demo application deployed" -ForegroundColor Green
+    Write-Host "  ✅ Movistar BSS application deployed" -ForegroundColor Green
     
     Write-Host "`n⏳ Waiting for workloads to roll out..." -ForegroundColor Yellow
-    $deploymentNamesRaw = kubectl get deployment -n pets -o jsonpath='{.items[*].metadata.name}' 2>$null
+    $deploymentNamesRaw = kubectl get deployment -n movistar -o jsonpath='{.items[*].metadata.name}' 2>$null
     $deploymentNames = @()
     if ($deploymentNamesRaw) {
         $deploymentNames = $deploymentNamesRaw -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     }
 
     foreach ($deploymentName in $deploymentNames) {
-        kubectl rollout status "deployment/$deploymentName" -n pets --timeout=300s 2>$null
+        kubectl rollout status "deployment/$deploymentName" -n movistar --timeout=300s 2>$null
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  ⚠️  Rollout still in progress for deployment/$deploymentName" -ForegroundColor Yellow
         }
     }
     
     # Wait for LoadBalancer IP
-    Write-Host "⏳ Waiting for store-front external IP..." -ForegroundColor Yellow
+    Write-Host "⏳ Waiting for customer-portal external IP..." -ForegroundColor Yellow
     $maxWait = 120
     $waited = 0
     $storeUrl = $null
     while ($waited -lt $maxWait) {
-        $externalIp = kubectl get svc store-front -n pets -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
+        $externalIp = kubectl get svc customer-portal -n movistar -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
         if ($externalIp) {
             $storeUrl = "http://$externalIp"
             break
@@ -738,10 +970,10 @@ if (Test-Path $k8sPath) {
     }
     
     if ($storeUrl) {
-        Write-Host "  ✅ Store Front URL: $storeUrl" -ForegroundColor Green
+        Write-Host "  ✅ Customer Portal URL: $storeUrl" -ForegroundColor Green
     }
     else {
-        Write-Host "  ⚠️  Store Front external IP is still pending. Check again with: kubectl get svc store-front -n pets" -ForegroundColor Yellow
+        Write-Host "  ⚠️  Customer Portal external IP is still pending. Check again with: kubectl get svc customer-portal -n movistar" -ForegroundColor Yellow
     }
 }
 else {
@@ -773,7 +1005,59 @@ if ($outputs.sreAgentId.value) {
     $configureScript = Join-Path $PSScriptRoot "configure-sre-agent.ps1"
     if (Test-Path $configureScript) {
         try {
-            & $configureScript -ResourceGroupName $resourceGroupName
+            $configureArgs = @('-ResourceGroupName', $resourceGroupName)
+
+            if ($DeploySkillsAndHooks) {
+                $configureArgs += '-DeploySkills'
+                $configureArgs += '-DeployHooks'
+                $configureArgs += '-DeployPlugins'
+            }
+
+            if ($DeployEnterprise) {
+                $configureArgs += '-DeployEnterprise'
+                if ($ServiceNowUrl) { $configureArgs += @('-ServiceNowUrl', $ServiceNowUrl) }
+                if ($ServiceNowClientId) { $configureArgs += @('-ServiceNowClientId', $ServiceNowClientId) }
+                if ($serviceNowClientSecretPlainText) { $configureArgs += @('-ServiceNowClientSecret', $serviceNowClientSecretPlainText) }
+                if ($pagerDutyTokenPlainText) { $configureArgs += @('-PagerDutyToken', $pagerDutyTokenPlainText) }
+                if ($GrafanaMcpUrl) { $configureArgs += @('-GrafanaMcpUrl', $GrafanaMcpUrl) }
+                if ($grafanaTokenPlainText) { $configureArgs += @('-GrafanaToken', $grafanaTokenPlainText) }
+                if ($AzureDevOpsOrgUrl) { $configureArgs += @('-AzureDevOpsOrgUrl', $AzureDevOpsOrgUrl) }
+                if ($AzureDevOpsProject) { $configureArgs += @('-AzureDevOpsProject', $AzureDevOpsProject) }
+                if ($azureDevOpsPatPlainText) { $configureArgs += @('-AzureDevOpsPat', $azureDevOpsPatPlainText) }
+                if ($teamsWebhookUrlPlainText) { $configureArgs += @('-TeamsWebhookUrl', $teamsWebhookUrlPlainText) }
+                if ($datadogApiKeyPlainText) { $configureArgs += @('-DatadogApiKey', $datadogApiKeyPlainText) }
+                if ($datadogAppKeyPlainText) { $configureArgs += @('-DatadogAppKey', $datadogAppKeyPlainText) }
+            }
+
+            if ($DeployGovernance) {
+                $configureArgs += '-DeployGovernance'
+            }
+
+            if ($DeployMultiStack) {
+                $configureArgs += '-DeployMultiStack'
+            }
+
+            if ($DeployAvd) {
+                $configureArgs += '-DeployAvd'
+            }
+
+            if ($mockCmdbUrl) {
+                $configureArgs += @('-MockCmdbUrl', $mockCmdbUrl)
+            }
+
+            if ($mockCmdbKey) {
+                $configureArgs += @('-MockCmdbKey', $mockCmdbKey)
+            }
+
+            if ($DeployCitrixMcp) {
+                $configureArgs += '-DeployCitrixMcp'
+                $configureArgs += @('-McpBearerToken', $mcpBearerTokenValue)
+                if ($citrixMcpUrl) {
+                    $configureArgs += @('-CitrixMcpUrl', $citrixMcpUrl)
+                }
+            }
+
+            & $configureScript @configureArgs
             Write-Host "  ✅ SRE Agent configuration complete" -ForegroundColor Green
         }
         catch {
@@ -788,7 +1072,7 @@ if ($outputs.sreAgentId.value) {
 
 # Final instructions
 $aksName = if ($outputs.aksClusterName.value) { $outputs.aksClusterName.value } else { "<check Azure Portal>" }
-$siteUrlDisplay = if ($storeUrl) { $storeUrl } else { "kubectl get svc store-front -n pets" }
+$siteUrlDisplay = if ($storeUrl) { $storeUrl } else { "kubectl get svc customer-portal -n movistar" }
 
 Write-Host @"
 
@@ -797,16 +1081,16 @@ Write-Host @"
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  Resources Deployed:                                                         ║
 ║    • AKS Cluster:    $($aksName.PadRight(44))║
-║    • Store Front:    $($siteUrlDisplay.PadRight(44))║
+║    • Customer Portal:    $($siteUrlDisplay.PadRight(44))║
 ║                                                                              ║
 ║  ℹ️  SRE Agent: See deployment output above for status                       ║
 ║    Portal: https://aka.ms/sreagent/portal                                    ║
 ║                                                                              ║
 ║  Quick Start (after SRE Agent setup):                                        ║
-║    1. Open the store: $siteUrlDisplay
+║    1. Open the portal: $siteUrlDisplay
 ║    2. Break something: break-oom                                             ║
-║    3. Refresh store to see failure                                           ║
-║    4. Ask SRE Agent: "Why are pods crashing in the pets namespace?"         ║
+║    3. Refresh the portal to see failure                                           ║
+║    4. Ask SRE Agent: "Why are pods crashing in the movistar namespace?"         ║
 ║    5. Fix it: fix-all                                                        ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 

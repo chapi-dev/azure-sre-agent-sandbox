@@ -18,7 +18,7 @@ param tags object
 param logAnalyticsWorkspaceId string
 
 @description('Application namespace to monitor')
-param appNamespace string = 'pets'
+param appNamespace string = 'movistar'
 
 @description('Optional action group resource IDs for alert notifications')
 param actionGroupIds array = []
@@ -27,7 +27,7 @@ var alertActions = {
   actionGroups: actionGroupIds
   customProperties: {
     source: 'azure-sre-agent-sandbox'
-    workload: 'pet-store'
+    workload: 'movistar-bss'
   }
 }
 
@@ -37,7 +37,7 @@ resource podRestartAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
   tags: tags
   kind: 'LogAlert'
   properties: {
-    displayName: 'Pet Store - Pod restart spike'
+    displayName: 'Movistar BSS - Pod restart spike'
     description: 'Triggers quickly when restart activity is detected in the application namespace.'
     enabled: true
     severity: 2
@@ -72,7 +72,7 @@ resource http5xxAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
   tags: tags
   kind: 'LogAlert'
   properties: {
-    displayName: 'Pet Store - HTTP 5xx spike'
+    displayName: 'Movistar BSS - HTTP 5xx spike'
     description: 'Triggers when 5xx request count increases in App Insights logs.'
     enabled: true
     severity: 1
@@ -107,7 +107,7 @@ resource podFailureAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
   tags: tags
   kind: 'LogAlert'
   properties: {
-    displayName: 'Pet Store - Failed or pending pods'
+    displayName: 'Movistar BSS - Failed or pending pods'
     description: 'Triggers quickly when failed or pending pods are detected in the application namespace.'
     enabled: true
     severity: 2
@@ -142,7 +142,7 @@ resource crashLoopOomAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' =
   tags: tags
   kind: 'LogAlert'
   properties: {
-    displayName: 'Pet Store - CrashLoop/OOM detected'
+    displayName: 'Movistar BSS - CrashLoop/OOM detected'
     description: 'Triggers when CrashLoopBackOff or OOM-related Kubernetes events are detected.'
     enabled: true
     severity: 1

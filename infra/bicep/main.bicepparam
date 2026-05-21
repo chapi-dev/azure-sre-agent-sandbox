@@ -20,6 +20,23 @@ param deploySreAgent = true
 // Default action group for incident routing (add webhook at deploy time)
 param deployActionGroup = false
 
+// Extended demo lab modules remain opt-in so the baseline lab still works unchanged.
+param deployMultiStack = false
+param deployAvd = false
+param deployCitrixMcp = false
+param deploySkillsAndHooks = false
+param deployGovernance = false
+
+param adminUsername = 'srelab-admin'
+
+// Sensitive params should NOT be hard-coded. Leave them empty or inject them via environment variables.
+// scripts/deploy.ps1 can also pass these with --parameters at deploy time.
+param adminPassword = readEnvironmentVariable('SRELAB_ADMIN_PASSWORD', '')
+param citrixCustomerId = readEnvironmentVariable('SRELAB_CITRIX_CUSTOMER_ID', '')
+param citrixClientId = readEnvironmentVariable('SRELAB_CITRIX_CLIENT_ID', '')
+param citrixClientSecret = readEnvironmentVariable('SRELAB_CITRIX_CLIENT_SECRET', '')
+param mcpBearerToken = readEnvironmentVariable('SRELAB_MCP_BEARER_TOKEN', '')
+
 // AKS Configuration - cost-optimized for demo
 param systemNodeVmSize = 'Standard_D2s_v5'
 param userNodeVmSize = 'Standard_D2s_v5'

@@ -489,7 +489,7 @@ if (-not $SkipScheduledTasks) {
         type       = "ScheduledTask"
         properties = @{
             cronExpression = "0 8 * * *"
-            agentPrompt    = "Run a comprehensive health check of the AKS cluster in the pets namespace. Check all pod statuses, recent restarts, resource utilization, and error trends. Report any issues found with severity ratings."
+            agentPrompt    = "Run a comprehensive health check of the AKS cluster in the movistar namespace. Check all pod statuses, recent restarts, resource utilization, and error trends. Report any issues found with severity ratings."
             agentName      = "cluster-health-monitor"
             enabled        = $true
         }
@@ -563,6 +563,6 @@ Write-Host "  1. Authorize Outlook connector in the portal (see above)" -Foregro
 Write-Host "  2. Open https://sre.azure.com and verify your agent configuration" -ForegroundColor White
 Write-Host "  3. Check Builder → Agent Canvas to see agents and triggers" -ForegroundColor White
 Write-Host "  4. Apply a breakable scenario: break-oom, break-crash, etc." -ForegroundColor White
-Write-Host "  5. Ask the agent: 'Why are pods crashing in the pets namespace?'" -ForegroundColor White
+Write-Host "  5. Ask the agent: 'Why are pods crashing in the movistar namespace?'" -ForegroundColor White
 Write-Host "  6. Or invoke directly: /agent incident-handler" -ForegroundColor White
 Write-Host ""

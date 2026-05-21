@@ -87,6 +87,42 @@ param tags object = {
   purpose: 'demonstration'
 }
 
+@description('Deploy Module A: multi-stack Azure (App Service + Cosmos + SQL + Function + Storage)')
+param deployMultiStack bool = false
+
+@description('Deploy Module B: Azure Virtual Desktop host pool and session hosts')
+param deployAvd bool = false
+
+@description('Deploy Module C: Citrix DaaS MCP server (Container App)')
+param deployCitrixMcp bool = false
+
+@description('Deploy Module D: Skills + Hooks infrastructure (mock CMDB Function + audit Storage)')
+param deploySkillsAndHooks bool = false
+
+@description('Deploy Module F: Governance — cost Workbook + AAU alert')
+param deployGovernance bool = false
+
+@secure()
+@description('Admin password for AVD session hosts and Azure SQL (Module B + A)')
+param adminPassword string = ''
+
+@description('Admin username for AVD/SQL')
+param adminUsername string = 'srelab-admin'
+
+@secure()
+@description('Citrix Cloud client secret (Module C)')
+param citrixClientSecret string = ''
+
+@description('Citrix Cloud customer ID (Module C)')
+param citrixCustomerId string = ''
+
+@description('Citrix Cloud client ID (Module C)')
+param citrixClientId string = ''
+
+@secure()
+@description('Bearer token for the Citrix MCP server (Module C). Generate a random string.')
+param mcpBearerToken string = ''
+
 // =============================================================================
 // VARIABLES
 // =============================================================================
@@ -106,6 +142,22 @@ var names = {
   managedIdentity: 'id-${workloadName}'
   vnet: 'vnet-${workloadName}'
   sreAgent: 'sre-${workloadName}'
+  appService: 'app-${workloadName}'
+  appServicePlan: 'asp-${workloadName}'
+  cosmos: 'cosmos-${workloadName}-${take(uniqueSuffix, 6)}'
+  sqlServer: 'sql-${workloadName}-${take(uniqueSuffix, 6)}'
+  functionApp: 'func-${workloadName}-${take(uniqueSuffix, 6)}'
+  functionStorage: 'stfunc${workloadName}${take(uniqueSuffix, 6)}'
+  storageExtra: 'st${workloadName}${take(uniqueSuffix, 6)}'
+  avdHostPool: 'hp-${workloadName}'
+  avdWorkspace: 'avdws-${workloadName}'
+  avdAppGroup: 'avdag-${workloadName}'
+  citrixContainerApp: 'ca-citrix-mcp-${workloadName}'
+  citrixMcpEnv: 'cae-${workloadName}'
+  mockCmdb: 'func-cmdb-${workloadName}-${take(uniqueSuffix, 6)}'
+  auditStorage: 'staudit${workloadName}${take(uniqueSuffix, 6)}'
+  costWorkbook: 'wb-sre-cost-${workloadName}'
+  costAlert: 'alert-sre-aau-${workloadName}'
 }
 
 // =============================================================================
@@ -234,6 +286,181 @@ module observability 'modules/observability.bicep' = if (deployObservability) {
   }
 }
 
+// Module A - Multi-stack Azure (optional)
+// Provide adminPassword at deploy time when deployMultiStack = true because Azure SQL requires a non-empty admin password.
+module cosmosDb 'modules/cosmos-db.bicep' = if (deployMultiStack) {
+  scope: resourceGroup
+  name: 'deploy-cosmos-db'
+  params: {
+    name: names.cosmos
+    location: location
+    tags: tags
+  }
+  dependsOn: [
+    logAnalytics
+    appInsights
+  ]
+}
+
+module sqlDatabase 'modules/sql-database.bicep' = if (deployMultiStack) {
+  scope: resourceGroup
+  name: 'deploy-sql-database'
+  params: {
+    name: names.sqlServer
+    location: location
+    tags: tags
+    adminLogin: adminUsername
+    adminPassword: adminPassword
+  }
+  dependsOn: [
+    logAnalytics
+    appInsights
+  ]
+}
+
+module functionApp 'modules/function-app.bicep' = if (deployMultiStack) {
+  scope: resourceGroup
+  name: 'deploy-function-app'
+  params: {
+    name: names.functionApp
+    location: location
+    tags: tags
+    appInsightsConnectionString: appInsights.outputs.connectionString
+  }
+}
+
+module storageExtra 'modules/storage-extra.bicep' = if (deployMultiStack) {
+  scope: resourceGroup
+  name: 'deploy-storage-extra'
+  params: {
+    name: names.storageExtra
+    location: location
+    tags: tags
+  }
+  dependsOn: [
+    logAnalytics
+    appInsights
+  ]
+}
+
+module appService 'modules/app-service.bicep' = if (deployMultiStack) {
+  scope: resourceGroup
+  name: 'deploy-app-service'
+  params: {
+    name: names.appService
+    location: location
+    tags: tags
+    appInsightsConnectionString: appInsights.outputs.connectionString
+    cosmosEndpoint: cosmosDb!.outputs.cosmosEndpoint
+    sqlConnectionString: 'Server=tcp:${sqlDatabase!.outputs.sqlServerFqdn},1433;Initial Catalog=movistar-bss-db;Persist Security Info=False;User ID=${adminUsername};Password=${adminPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;'
+  }
+}
+
+// Module B - Azure Virtual Desktop (optional)
+// Provide adminPassword at deploy time when deployAvd = true because Bicep cannot assert non-empty secure strings here.
+module avd 'modules/avd-hostpool.bicep' = if (deployAvd) {
+  scope: resourceGroup
+  name: 'deploy-avd'
+  params: {
+    name: names.avdHostPool
+    location: location
+    tags: tags
+    vnetSubnetId: network.outputs.servicesSubnetId
+    adminUsername: adminUsername
+    adminPassword: adminPassword
+    workspaceId: logAnalytics.outputs.workspaceId
+  }
+}
+
+module avdMonitoring 'modules/avd-monitoring.bicep' = if (deployAvd) {
+  scope: resourceGroup
+  name: 'deploy-avd-monitoring'
+  params: {
+    hostPoolName: avd!.outputs.hostPoolName
+    workspaceName: last(split(avd!.outputs.workspaceResourceId, '/'))
+    applicationGroupName: last(split(avd!.outputs.applicationGroupId, '/'))
+    logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
+  }
+}
+
+// Module C - Citrix MCP (optional)
+module citrixMcpKeyVault 'modules/citrix-mcp-keyvault.bicep' = if (deployCitrixMcp) {
+  scope: resourceGroup
+  name: 'deploy-citrix-mcp-keyvault'
+  params: {
+    keyVaultName: keyVault.outputs.keyVaultName
+    citrixCustomerId: citrixCustomerId
+    citrixClientId: citrixClientId
+    citrixClientSecret: citrixClientSecret
+    mcpBearerToken: mcpBearerToken
+  }
+}
+
+module citrixMcpContainer 'modules/citrix-mcp-container.bicep' = if (deployCitrixMcp) {
+  scope: resourceGroup
+  name: 'deploy-citrix-mcp-container'
+  params: {
+    name: names.citrixContainerApp
+    location: location
+    tags: tags
+    acrId: containerRegistry.outputs.acrId
+    keyVaultId: keyVault.outputs.keyVaultId
+  }
+  dependsOn: [
+    citrixMcpKeyVault
+  ]
+}
+
+// Module D - Skills and Hooks (optional)
+// deploySkillsAndHooks assumes deploySreAgent = true so the audit account can grant the SRE Agent identity write access.
+// Reuse storage-extra.bicep for the mock CMDB Function runtime because this subscription-scoped template can't inline RG-scoped resources.
+module mockCmdbStorage 'modules/storage-extra.bicep' = if (deploySkillsAndHooks) {
+  scope: resourceGroup
+  name: 'deploy-mock-cmdb-storage'
+  params: {
+    name: names.functionStorage
+    location: location
+    tags: union(tags, {
+      module: 'skills-hooks'
+      component: 'mock-cmdb-storage'
+    })
+  }
+}
+
+module mockCmdbFunction 'modules/mock-cmdb-function.bicep' = if (deploySkillsAndHooks) {
+  scope: resourceGroup
+  name: 'deploy-mock-cmdb-function'
+  params: {
+    name: names.mockCmdb
+    location: location
+    tags: tags
+    appInsightsConnectionString: appInsights.outputs.connectionString
+    storageAccountId: mockCmdbStorage!.outputs.storageAccountId
+    storageAccountName: mockCmdbStorage!.outputs.storageAccountName
+  }
+}
+
+resource mockCmdbFunctionApp 'Microsoft.Web/sites@2023-12-01' existing = if (deploySkillsAndHooks) {
+  scope: resourceGroup
+  name: mockCmdbFunction!.outputs.functionAppName
+}
+
+resource mockCmdbFunctionHost 'Microsoft.Web/sites/host@2022-09-01' existing = if (deploySkillsAndHooks) {
+  parent: mockCmdbFunctionApp
+  name: 'default'
+}
+
+module auditStorage 'modules/audit-storage.bicep' = if (deploySkillsAndHooks) {
+  scope: resourceGroup
+  name: 'deploy-audit-storage'
+  params: {
+    name: names.auditStorage
+    location: location
+    tags: tags
+    sreAgentPrincipalId: sreAgent!.outputs.managedIdentityPrincipalId
+  }
+}
+
 module defaultActionGroup 'modules/action-group.bicep' = if (deployActionGroup) {
   scope: resourceGroup
   name: 'deploy-default-action-group'
@@ -258,7 +485,32 @@ module alerts 'modules/alerts.bicep' = if (deployAlerts) {
     location: location
     tags: tags
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
-    appNamespace: 'pets'
+    appNamespace: 'movistar'
+    actionGroupIds: effectiveAlertActionGroupIds
+  }
+}
+
+// Module F - Governance (optional)
+module costWorkbook 'modules/cost-workbook.bicep' = if (deployGovernance) {
+  scope: resourceGroup
+  name: 'deploy-cost-workbook'
+  params: {
+    name: names.costWorkbook
+    location: location
+    tags: tags
+    logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
+  }
+}
+
+module costAlerts 'modules/cost-alerts.bicep' = if (deployGovernance) {
+  scope: resourceGroup
+  name: 'deploy-cost-alerts'
+  params: {
+    name: names.costAlert
+    location: location
+    tags: tags
+    logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
+    dailyAauThreshold: 50
     actionGroupIds: effectiveAlertActionGroupIds
   }
 }
@@ -295,3 +547,19 @@ output sreAgentPortalUrl string = deploySreAgent ? sreAgent!.outputs.agentPortal
 output sreAgentName string = deploySreAgent ? sreAgent!.outputs.agentName : ''
 output sreAgentManagedIdentityId string = deploySreAgent ? sreAgent!.outputs.managedIdentityId : ''
 output sreAgentManagedIdentityPrincipalId string = deploySreAgent ? sreAgent!.outputs.managedIdentityPrincipalId : ''
+output appServiceUrl string = deployMultiStack ? appService!.outputs.appServiceUrl : ''
+output cosmosEndpoint string = deployMultiStack ? cosmosDb!.outputs.cosmosEndpoint : ''
+output sqlServerFqdn string = deployMultiStack ? sqlDatabase!.outputs.sqlServerFqdn : ''
+output functionAppDefaultHostName string = deployMultiStack ? functionApp!.outputs.functionAppDefaultHostName : ''
+output storageExtraName string = deployMultiStack ? storageExtra!.outputs.storageAccountName : ''
+output avdHostPoolName string = deployAvd ? avd!.outputs.hostPoolName : ''
+output avdWorkspaceName string = deployAvd ? last(split(avd!.outputs.workspaceResourceId, '/')) : ''
+output avdApplicationGroupId string = deployAvd ? avd!.outputs.applicationGroupId : ''
+output citrixMcpContainerAppFqdn string = deployCitrixMcp ? citrixMcpContainer!.outputs.containerAppFqdn : ''
+output mockCmdbUrl string = deploySkillsAndHooks ? 'https://${mockCmdbFunction!.outputs.functionAppDefaultHostName}/api' : ''
+@secure()
+#disable-next-line outputs-should-not-contain-secrets
+output mockCmdbFunctionKey string = deploySkillsAndHooks ? mockCmdbFunctionHost!.listKeys().functionKeys.default : ''
+output auditStorageName string = deploySkillsAndHooks ? auditStorage!.outputs.storageAccountName : ''
+output costWorkbookId string = deployGovernance ? costWorkbook!.outputs.workbookId : ''
+output costAlertId string = deployGovernance ? costAlerts!.outputs.alertId : ''

@@ -1,6 +1,6 @@
 # Resource Exhaustion Investigation Runbook
 
-Diagnose and remediate CPU contention, memory pressure, and scheduling failures in the AKS cluster running the pets e-commerce application.
+Diagnose and remediate CPU contention, memory pressure, and scheduling failures in the AKS cluster running the Movistar BSS application.
 
 ---
 
@@ -17,12 +17,12 @@ Diagnose and remediate CPU contention, memory pressure, and scheduling failures 
 
 ## Step 2: CPU Contention
 
-**Symptoms:** Application responses are slow, CPU throttling, high latency
+**Symptoms:** `customer-portal`, `activation-service`, or `catalog-service` responses are slow; CPU throttling and latency rise together
 
 **Diagnostic steps:**
 1. Check CPU usage across pods:
    ```bash
-   kubectl top pods -n pets --sort-by=cpu
+   kubectl top pods -n movistar --sort-by=cpu
    ```
 2. Check node-level CPU:
    ```bash
@@ -30,23 +30,23 @@ Diagnose and remediate CPU contention, memory pressure, and scheduling failures 
    ```
 3. Look for CPU stress workloads:
    ```bash
-   kubectl get pods -n pets | grep -i stress
-   kubectl get deployment -n pets | grep -i stress
+   kubectl get pods -n movistar | grep -i stress
+   kubectl get deployment -n movistar | grep -i stress
    ```
 4. Query CPU metrics:
    ```kql
    InsightsMetrics
    | where TimeGenerated > ago(1h)
-   | where Namespace == "pets"
+   | where Namespace == "movistar"
    | where Name == "cpuUsageNanoCores"
    | summarize AvgCPU = avg(Val) by PodUid, bin(TimeGenerated, 5m)
    | order by AvgCPU desc
    ```
 
 **Remediation:**
-- Delete rouge CPU stress workloads:
+- Delete rogue CPU stress workloads:
   ```bash
-  kubectl delete deployment cpu-stress-test -n pets
+  kubectl delete deployment cpu-stress-test -n movistar
   ```
 - Adjust CPU limits for legitimate workloads
 - Apply healthy baseline: `kubectl apply -f k8s/base/application.yaml`
@@ -55,16 +55,16 @@ Diagnose and remediate CPU contention, memory pressure, and scheduling failures 
 
 ## Step 3: Memory Pressure
 
-**Symptoms:** Pods restarting with OOMKilled, node reporting MemoryPressure
+**Symptoms:** Pods restarting with OOMKilled, node reporting MemoryPressure, or activation flows failing under burst load
 
 **Diagnostic steps:**
 1. Check memory usage:
    ```bash
-   kubectl top pods -n pets --sort-by=memory
+   kubectl top pods -n movistar --sort-by=memory
    ```
 2. Check for OOM events:
    ```bash
-   kubectl get events -n pets --field-selector reason=OOMKilling
+   kubectl get events -n movistar --field-selector reason=OOMKilling
    ```
 3. Check node conditions:
    ```bash
@@ -74,14 +74,14 @@ Diagnose and remediate CPU contention, memory pressure, and scheduling failures 
    ```kql
    InsightsMetrics
    | where TimeGenerated > ago(1h)
-   | where Namespace == "pets"
+   | where Namespace == "movistar"
    | where Name == "memoryWorkingSetBytes"
    | summarize AvgMem = avg(Val) by PodUid, bin(TimeGenerated, 5m)
    | order by AvgMem desc
    ```
 
 **Remediation:**
-- Increase memory limits for affected pods
+- Increase memory limits for affected pods such as `activation-service` or `provisioning-service`
 - Check for memory leaks in application code
 - Apply healthy baseline: `kubectl apply -f k8s/base/application.yaml`
 
@@ -89,16 +89,16 @@ Diagnose and remediate CPU contention, memory pressure, and scheduling failures 
 
 ## Step 4: Scheduling Failures
 
-**Symptoms:** Pods stuck in Pending, scheduler can't find a node with enough resources
+**Symptoms:** Pods stuck in Pending, scheduler cannot find a node with enough resources
 
 **Diagnostic steps:**
 1. Check pod events:
    ```bash
-   kubectl describe pod <pod-name> -n pets | grep -A 10 "Events"
+   kubectl describe pod <pod-name> -n movistar | grep -A 10 "Events"
    ```
 2. Check what resources the pod requests:
    ```bash
-   kubectl get pod <pod-name> -n pets -o jsonpath='{.spec.containers[0].resources.requests}'
+   kubectl get pod <pod-name> -n movistar -o jsonpath='{.spec.containers[0].resources.requests}'
    ```
 3. Compare to node capacity:
    ```bash
@@ -106,7 +106,7 @@ Diagnose and remediate CPU contention, memory pressure, and scheduling failures 
    ```
 4. Look for oversized requests:
    ```bash
-   kubectl get pods -n pets -o custom-columns='NAME:.metadata.name,CPU_REQ:.spec.containers[0].resources.requests.cpu,MEM_REQ:.spec.containers[0].resources.requests.memory'
+   kubectl get pods -n movistar -o custom-columns='NAME:.metadata.name,CPU_REQ:.spec.containers[0].resources.requests.cpu,MEM_REQ:.spec.containers[0].resources.requests.memory'
    ```
 
 **Remediation:**
@@ -119,7 +119,7 @@ Diagnose and remediate CPU contention, memory pressure, and scheduling failures 
 
 ## Step 5: Node Health
 
-**Symptoms:** Node reporting conditions like NotReady, DiskPressure, MemoryPressure, PIDPressure
+**Symptoms:** Node reporting conditions like NotReady, DiskPressure, MemoryPressure, or PIDPressure
 
 **Diagnostic steps:**
 1. Check node conditions:

@@ -1,0 +1,48 @@
+api_version: azuresre.ai/v2
+kind: Plugin
+spec:
+  name: cmdb-http-plugin
+  description: Queries a mock CMDB Function App for service ownership, criticality, dependencies, and linked runbooks.
+  type: HTTP
+  baseUri: MOCK_CMDB_URL_PLACEHOLDER
+  authenticationType: FunctionKey
+  authentication:
+    in: header
+    name: x-functions-key
+  operations:
+    - id: get_service_owner
+      method: GET
+      path: /services/{serviceName}/owner
+      params:
+        - name: serviceName
+          in: path
+          type: string
+      returns:
+        type: object
+    - id: get_service_criticality
+      method: GET
+      path: /services/{serviceName}/criticality
+      params:
+        - name: serviceName
+          in: path
+          type: string
+      returns:
+        type: object
+    - id: list_dependent_services
+      method: GET
+      path: /services/{serviceName}/dependencies
+      params:
+        - name: serviceName
+          in: path
+          type: string
+      returns:
+        type: object
+    - id: lookup_runbook_for_service
+      method: GET
+      path: /services/{serviceName}/runbook
+      params:
+        - name: serviceName
+          in: path
+          type: string
+      returns:
+        type: object

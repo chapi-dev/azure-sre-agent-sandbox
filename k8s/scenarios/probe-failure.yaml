@@ -1,8 +1,10 @@
 # =============================================================================
-# SCENARIO 6: Failed Liveness Probe - Health Check Failure
+# Movistar BSS Application (Telefónica demo, rebranded from AKS-store-demo)
 # =============================================================================
-# This scenario deploys a service with a liveness probe that always fails,
-# causing Kubernetes to continuously restart the pod.
+# SCENARIO 6: Failed Liveness Probe - Health checks failing
+# =============================================================================
+# This scenario makes provisioning-service fail liveness/readiness checks,
+# causing Kubernetes to restart the pods continuously.
 #
 # SRE Agent can diagnose: Pod being killed due to failed liveness probe,
 # recommend checking application health endpoint or probe configuration.
@@ -11,33 +13,33 @@
 # kubectl apply -f k8s/scenarios/probe-failure.yaml
 #
 # HOW TO FIX:
-# kubectl delete deployment unhealthy-service -n pets
+# kubectl apply -f k8s/base/application.yaml
 # =============================================================================
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: unhealthy-service
-  namespace: pets
+  name: provisioning-service
+  namespace: movistar
   labels:
-    app: unhealthy-service
+    app: provisioning-service
     scenario: probe-failure
     sre-demo: breakable
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: unhealthy-service
+      app: provisioning-service
   template:
     metadata:
       labels:
-        app: unhealthy-service
+        app: provisioning-service
         scenario: probe-failure
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: unhealthy-app
+        - name: provisioning-service
           image: mcr.microsoft.com/mirror/docker/library/nginx:alpine
           ports:
             - containerPort: 80

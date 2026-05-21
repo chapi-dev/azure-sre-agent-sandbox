@@ -1,0 +1,24 @@
+api_version: azuresre.ai/v1
+kind: Hook
+spec:
+  name: post-tool-audit
+  description: Writes an immutable JSON audit event for every tool invocation to the audit storage account using managed identity.
+  type: PostToolUse
+  matchTools:
+    - '*'
+  policy:
+    action: emit
+    sink:
+      type: AzureBlob
+      authenticationType: ManagedIdentity
+      contentType: application/json
+      uriTemplate: https://staudit<suffix>.blob.core.windows.net/agent-audit/{date}/{toolName}-{timestamp}.json
+    payloadTemplate:
+      hookName: post-tool-audit
+      toolName: '{toolName}'
+      timestampUtc: '{timestamp}'
+      requestId: '{requestId}'
+      status: '{status}'
+      latencyMs: '{latencyMs}'
+      arguments: '{arguments}'
+      result: '{result}'

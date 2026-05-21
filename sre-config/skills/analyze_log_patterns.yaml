@@ -1,0 +1,18 @@
+api_version: azuresre.ai/v1
+kind: Skill
+spec:
+  name: analyze-log-patterns
+  description: Flags anomalous log lines from raw logs or serialized KQL results and returns the top five suspicious entries.
+  runtime: python3.11
+  entrypoint: analyze_log_patterns.py:main
+  parameters:
+    - name: log_lines
+      type: string
+      description: Newline-separated log lines or a serialized JSON KQL result payload.
+      required: true
+    - name: window_minutes
+      type: integer
+      description: Analysis window used for scoring context and reporting.
+      default: 15
+  returns:
+    type: object

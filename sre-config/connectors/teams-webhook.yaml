@@ -1,0 +1,32 @@
+# Teams Webhook Connector — Dataplane v2 API format
+# Use case: outbound notifications only.
+# Create a webhook by using Microsoft Teams Workflows (the replacement for deprecated
+# classic Office 365 connectors), then copy the generated HTTPS endpoint into Key Vault.
+# The webhook payload should be an Adaptive Card JSON document.
+api_version: azuresre.ai/v2
+kind: DataConnector
+spec:
+  name: teams-webhook
+  dataConnectorType: Webhook
+  dataSource: teams-channel
+  authenticationType: WebhookUrl
+  deliveryMode: OutboundOnly
+  webhookUrl: https://YOUR_WORKFLOW_OR_TEAMS_WEBHOOK_URL
+  contentType: application/json
+  payloadFormat: AdaptiveCard
+  samplePayload:
+    type: message
+    attachments:
+      - contentType: application/vnd.microsoft.card.adaptive
+        content:
+          "$schema": http://adaptivecards.io/schemas/adaptive-card.json
+          type: AdaptiveCard
+          version: "1.5"
+          body:
+            - type: TextBlock
+              size: Large
+              weight: Bolder
+              text: "[SRE Agent] Incident update"
+            - type: TextBlock
+              wrap: true
+              text: "Summary, impact, links, and next actions go here."

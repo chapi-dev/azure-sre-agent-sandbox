@@ -1,0 +1,30 @@
+api_version: azuresre.ai/v1
+kind: Skill
+spec:
+  name: generate-incident-pdf
+  description: Generates a PDF incident report with summary text, evidence bullets, and optional charts for numeric metrics.
+  runtime: python3.11
+  entrypoint: generate_incident_pdf.py:main
+  parameters:
+    - name: title
+      type: string
+      description: Incident report title shown on the PDF cover section.
+      required: true
+    - name: summary
+      type: string
+      description: Executive summary for the incident.
+      required: true
+    - name: evidence
+      type: array
+      description: List of evidence bullets to render in the report.
+      required: true
+    - name: metrics
+      type: array
+      description: List of metric objects with name, values, and timestamps used for charting.
+      required: false
+    - name: recommendations
+      type: array
+      description: List of recommended remediation or follow-up actions.
+      required: false
+  returns:
+    type: object

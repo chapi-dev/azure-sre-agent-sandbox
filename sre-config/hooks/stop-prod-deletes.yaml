@@ -1,0 +1,30 @@
+api_version: azuresre.ai/v1
+kind: Hook
+spec:
+  name: stop-prod-deletes
+  description: Blocks destructive Azure CLI or kubectl delete operations outside business hours or when the target resource is tagged as production.
+  type: Stop
+  matchTools:
+    - RunAzCliWriteCommands
+    - RunKubectlCommands
+  policy:
+    conditionGroups:
+      anyOf:
+        - name: destructive-command-outside-business-hours
+          allOf:
+            - field: command
+              operator: matches
+              value: (?i)(az\s+.+\b(delete|remove)\b|kubectl\s+.+\bdelete\b)
+            - field: requestTimeUtc
+              operator: outsideBusinessHours
+              value: Mon-Fri 08:00-18:00 UTC
+        - name: destructive-command-targets-production
+          allOf:
+            - field: command
+              operator: matches
+              value: (?i)(az\s+.+\b(delete|remove)\b|kubectl\s+.+\bdelete\b)
+            - field: resourceTags.environment
+              operator: equals
+              value: production
+    action: deny
+    message: Destructive operations are blocked outside Mon-Fri 08:00-18:00 UTC and against environment=production resources without an approved exception.

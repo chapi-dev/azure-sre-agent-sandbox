@@ -1,0 +1,11 @@
+# Citrix MCP Connector — Dataplane v2 API format
+# configure-sre-agent.ps1 should replace CITRIX_MCP_URL_PLACEHOLDER with the Container App FQDN.
+# Example runtime auth header: Authorization: Bearer <citrix-mcp-shared-token>
+api_version: azuresre.ai/v2
+kind: DataConnector
+spec:
+  name: citrix-mcp
+  dataConnectorType: StreamableHttp
+  dataSource: citrix
+  serverUri: https://CITRIX_MCP_URL_PLACEHOLDER/mcp
+  authenticationType: BearerToken

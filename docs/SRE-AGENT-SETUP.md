@@ -1,6 +1,6 @@
 # Azure SRE Agent Setup Guide
 
-This guide walks you through setting up Azure SRE Agent to work with the demo lab environment.
+This guide walks you through setting up Azure SRE Agent to work with the **Movistar BSS demo lab** environment.
 
 ## What is Azure SRE Agent?
 
@@ -11,6 +11,8 @@ Azure SRE Agent (Preview) is an AI-powered site reliability engineering automati
 - **Run remediation actions** to fix common problems
 - **Create scheduled tasks** for proactive monitoring
 - **Integrate with external tools** like Grafana, PagerDuty, and ServiceNow
+
+In this lab, the agent investigates a **Movistar self-service and provisioning platform** running on AKS in the `movistar` namespace.
 
 ## Prerequisites
 
@@ -46,7 +48,6 @@ You can also create the agent manually:
    - **Resource Group**: Create new or use existing (separate from demo resources)
    - **Name**: `sre-agent-demo` (or your preferred name)
    - **Region**: Must match one of: `East US 2`, `Sweden Central`, `Australia East`
-
 5. Click **Review + Create**, then **Create**
 
 ### What Gets Created
@@ -60,7 +61,7 @@ When you create an SRE Agent, Azure automatically provisions:
 
 The SRE Agent needs access to your Azure resources to diagnose and **remediate** issues.
 
-> **Note**: When deployed via Bicep (default), the agent's managed identity is automatically assigned Reader, Contributor, and Log Analytics Reader roles on the deployment resource group. The script below grants additional AKS-specific roles.
+> **Note:** When deployed via Bicep (default), the agent's managed identity is automatically assigned Reader, Contributor, and Log Analytics Reader roles on the deployment resource group. The script below grants additional AKS-specific roles.
 
 ### Grant Access to Demo Resources
 
@@ -88,8 +89,8 @@ The script assigns these roles to enable both **diagnosis AND remediation**:
 | **Key Vault** | Key Vault Secrets Officer | Manage secrets |
 | **Container Registry** | AcrPush | Push/pull container images |
 
-> **Note**: These are **write permissions** that allow SRE Agent to take actions like:
-> - Restart pods, scale deployments, delete stuck resources
+> **Note:** These are **write permissions** that allow SRE Agent to take actions like:
+> - Restart pods, scale deployments, and delete stuck resources
 > - Query and analyze logs
 > - Access/update Key Vault secrets
 > - Push/pull container images
@@ -100,9 +101,9 @@ Assign these roles to **users** who will interact with SRE Agent:
 
 | Role | Description |
 |------|-------------|
-| **SRE Agent Admin** | Full access - create agents, manage settings, assign roles |
-| **SRE Agent Standard User** | Chat with agent, run diagnostics and remediation |
-| **SRE Agent Reader** | View-only access to agent and chat history |
+| **SRE Agent Admin** | Full access — create agents, manage settings, assign roles |
+| **SRE Agent Standard User** | Chat with agent, run diagnostics, and trigger remediation |
+| **SRE Agent Reader** | View-only access to the agent and chat history |
 
 Assign roles to users via Azure Portal:
 1. Navigate to your SRE Agent resource
@@ -127,21 +128,21 @@ You can also connect:
 - Azure Monitor Workspace (Prometheus)
 - Managed Grafana
 
-## Step 4: Start Diagnosing!
+## Step 4: Start Diagnosing
 
-Once connected, you can interact with SRE Agent using natural language:
+Once connected, you can interact with SRE Agent using natural language.
 
 ### Starter Prompts for AKS
 
 - "Show me the health status of my AKS cluster"
-- "Why are pods crashing in the pets namespace?"
+- "Why are pods crashing in the movistar namespace?"
 - "What's causing high CPU usage on my nodes?"
 - "List all pods that have restarted in the last hour"
-- "Diagnose the CrashLoopBackOff error for the order-service pod"
+- "Diagnose the CrashLoopBackOff error for the catalog-service pod"
 
 ### Starter Prompts for General Diagnosis
 
-- "What issues are affecting my application right now?"
+- "What issues are affecting Mi Movistar right now?"
 - "Show me errors from the last 24 hours"
 - "Analyze the performance metrics and identify bottlenecks"
 - "What changes were made to my resources recently?"
@@ -154,17 +155,13 @@ Once connected, you can interact with SRE Agent using natural language:
    ```bash
    kubectl apply -f k8s/scenarios/oom-killed.yaml
    ```
-
-2. **Wait for pods to crash** (1-2 minutes)
-
+2. **Wait for pods to crash** (1–2 minutes)
 3. **Ask SRE Agent:**
-   > "I'm seeing pods crash in the pets namespace. Can you diagnose the issue?"
-
-4. **Expected Response:**
-   - SRE Agent will identify OOMKilled events
-   - Recommend increasing memory limits
+   > "I'm seeing pods crash in the movistar namespace. Can you diagnose the issue?"
+4. **Expected response:**
+   - SRE Agent identifies OOMKilled events
+   - Recommends increasing memory limits
    - May offer to create a remediation action
-
 5. **Fix the issue:**
    ```bash
    kubectl apply -f k8s/base/application.yaml
@@ -172,17 +169,15 @@ Once connected, you can interact with SRE Agent using natural language:
 
 ### Example: Diagnosing Network Issues
 
-1. **Apply network policy:**
+1. **Apply the network policy scenario:**
    ```bash
    kubectl apply -f k8s/scenarios/network-block.yaml
    ```
-
 2. **Ask SRE Agent:**
-   > "The order-service seems to be unreachable. What's blocking traffic?"
-
-3. **Expected Response:**
-   - Identifies blocking network policy
-   - Shows affected pods
+   > "The activation-service seems to be unreachable. What's blocking traffic?"
+3. **Expected response:**
+   - Identifies the blocking network policy
+   - Shows affected pods and services
    - Recommends removing or modifying the policy
 
 ## Advanced Features
@@ -238,10 +233,10 @@ The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a su
 
 | Component | Description |
 |-----------|-------------|
-| **Knowledge Base** | Runbooks for pod failures, networking, dependencies, resource exhaustion, app architecture |
+| **Knowledge Base** | Runbooks for pod failures, networking, dependencies, resource exhaustion, and Movistar BSS architecture |
 | **incident-handler** | Custom agent that investigates alerts using runbooks, log analysis, and emails results |
 | **cluster-health-monitor** | Custom agent for proactive health checks with email reports |
-| **code-analyzer** | (GitHub only) Custom agent for source code root cause analysis |
+| **code-analyzer** | (GitHub only) Custom agent for source-code root cause analysis |
 | **Azure Monitor** | Connector for incident detection and alerting |
 | **Outlook** | Connector for email delivery (requires portal authorization) |
 | **GitHub MCP** | (Optional) Connector for searching code and creating issues |
@@ -270,7 +265,7 @@ Incident response plans **cannot** be created via the dataplane API — the `inc
    - **Title contains:** pod
    - **Response agent:** incident-handler
    - **Agent autonomy:** Review
-4. Save — incidents matching the filter will automatically trigger the subagent
+4. Save — incidents matching the filter automatically trigger the subagent
 
 ### Partial Re-runs
 
@@ -318,7 +313,7 @@ To add your own runbooks:
 
 **Symptom:** Agent can't connect or times out
 
-**Solution:** Ensure `*.azuresre.ai` is allowed through your firewall/proxy
+**Solution:** Ensure `*.azuresre.ai` is allowed through your firewall or proxy
 
 ## Cost Information
 
@@ -329,7 +324,7 @@ SRE Agent billing is based on Azure AI Units (AAU):
 | Fixed agent cost | ~$292/month (4 AAU × 730 hours × $0.10) |
 | Execution costs | Variable based on usage |
 
-See [docs/COSTS.md](COSTS.md) for full cost breakdown including AKS and other resources.
+See [docs/COSTS.md](COSTS.md) for the full cost breakdown including AKS and other resources.
 
 ## Additional Resources
 

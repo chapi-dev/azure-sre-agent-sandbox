@@ -1,6 +1,6 @@
 # Dependency Failure Investigation Runbook
 
-Diagnose cascading failures caused by backend dependency outages in the pets e-commerce application on AKS. Covers MongoDB and RabbitMQ failures and their downstream impact.
+Diagnose cascading failures caused by backend dependency outages in the Movistar BSS application on AKS. Covers subscriber-db and provisioning-queue failures and their downstream impact.
 
 ---
 
@@ -8,15 +8,15 @@ Diagnose cascading failures caused by backend dependency outages in the pets e-c
 
 | Service | Role | Dependencies |
 |---------|------|-------------|
-| store-front | Customer web UI | order-service, product-service |
-| store-admin | Admin dashboard | order-service, product-service, makeline-service |
-| order-service | Accepts orders, writes to DB and queue | mongodb, rabbitmq |
-| product-service | Serves product catalog | mongodb |
-| makeline-service | Processes orders from queue | mongodb, rabbitmq |
-| virtual-customer | Simulates orders | store-front |
-| virtual-worker | Simulates order processing | makeline-service |
-| mongodb | Primary data store | PersistentVolumeClaim (mongodb-data-pvc) |
-| rabbitmq | Message queue | In-memory |
+| customer-portal | Consumer self-service UI | activation-service, catalog-service |
+| csr-console | CSR workspace | activation-service, catalog-service, provisioning-service |
+| activation-service | Accepts activations, plan changes, and recharges | catalog-service, subscriber-db, provisioning-queue |
+| catalog-service | Serves plans and bundle catalog data | subscriber-db |
+| provisioning-service | Applies provisioning and service changes | subscriber-db, provisioning-queue |
+| traffic-simulator | Simulates subscriber activations | customer-portal |
+| network-worker | Simulates operational completion | provisioning-service |
+| subscriber-db | Subscriber state store | PersistentVolumeClaim (`mongodb-data-pvc`) |
+| provisioning-queue | Provisioning queue | In-memory |
 
 ---
 
@@ -26,24 +26,24 @@ When multiple services report errors simultaneously, the root cause is usually a
 
 1. Check which pods are unhealthy:
    ```bash
-   kubectl get pods -n pets
+   kubectl get pods -n movistar
    ```
 2. Check logs across failing services:
    ```bash
-   kubectl logs -l app=order-service -n pets --tail=20
-   kubectl logs -l app=product-service -n pets --tail=20
-   kubectl logs -l app=makeline-service -n pets --tail=20
+   kubectl logs -l app=activation-service -n movistar --tail=20
+   kubectl logs -l app=catalog-service -n movistar --tail=20
+   kubectl logs -l app=provisioning-service -n movistar --tail=20
    ```
 3. Check backing services:
    ```bash
-   kubectl get pods -n pets -l app=mongodb
-   kubectl get pods -n pets -l app=rabbitmq
+   kubectl get pods -n movistar -l app=subscriber-db
+   kubectl get pods -n movistar -l app=provisioning-queue
    ```
 
 | Pattern | Root Cause |
 |---------|-----------|
-| order-service, product-service, makeline-service all failing | MongoDB is down |
-| order-service failing, makeline-service idle | RabbitMQ is down |
+| activation-service, catalog-service, provisioning-service all failing | subscriber-db is down |
+| activation-service failing, provisioning-service idle | provisioning-queue is down |
 | Only one service failing | Isolated issue (see pod-failures runbook) |
 
 ---
@@ -51,73 +51,75 @@ When multiple services report errors simultaneously, the root cause is usually a
 ## Step 2: MongoDB Down
 
 **Symptoms:**
-- order-service, product-service, makeline-service return errors or fail health checks
-- store-front loads but shows empty catalog or can't place orders
-- MongoDB pod has 0 replicas or is in CrashLoopBackOff
+- `provisioning-service` cannot read subscriber data and fails health checks
+- `activation-service` cannot validate or persist subscriber state, so activations and recharges fail
+- `customer-portal` loads but line activations or top-ups do not complete
+- `subscriber-db` has 0 replicas or is in CrashLoopBackOff
 
 **Diagnostic steps:**
-1. Check MongoDB pod status:
+1. Check the `subscriber-db` pod status:
    ```bash
-   kubectl get deployment mongodb -n pets
-   kubectl get pods -l app=mongodb -n pets
+   kubectl get deployment subscriber-db -n movistar
+   kubectl get pods -l app=subscriber-db -n movistar
    ```
-2. Check MongoDB PVC:
+2. Check the backing PVC:
    ```bash
-   kubectl get pvc mongodb-data-pvc -n pets
+   kubectl get pvc mongodb-data-pvc -n movistar
    ```
 3. Check logs of dependent services for connection errors:
    ```bash
-   kubectl logs -l app=order-service -n pets --tail=10 | grep -i "mongo\|connection\|error"
+   kubectl logs -l app=provisioning-service -n movistar --tail=10 | grep -i "mongo\|subscriber\|connection\|error"
+   kubectl logs -l app=activation-service -n movistar --tail=10 | grep -i "mongo\|subscriber\|connection\|error"
    ```
 4. Query Log Analytics for the timeline:
    ```kql
    KubePodInventory
-   | where Namespace == "pets"
-   | where Name contains "mongodb"
+   | where Namespace == "movistar"
+   | where Name contains "subscriber-db"
    | where TimeGenerated > ago(1h)
    | project TimeGenerated, Name, PodStatus, PodRestartCount
    | order by TimeGenerated desc
    ```
 
 **Remediation:**
-- Scale MongoDB back up:
+- Scale `subscriber-db` back up:
   ```bash
-  kubectl scale deployment mongodb -n pets --replicas=1
+  kubectl scale deployment subscriber-db -n movistar --replicas=1
   ```
-- Or apply healthy baseline:
+- Or apply the healthy baseline:
   ```bash
   kubectl apply -f k8s/base/application.yaml
   ```
-- Dependent services should auto-recover once MongoDB is available
+- Dependent services should auto-recover once `subscriber-db` is available; `provisioning-service` usually stabilizes first, then `activation-service`
 
 ---
 
-## Step 3: RabbitMQ Down
+## Step 3: Provisioning Queue Down
 
 **Symptoms:**
-- order-service can't publish messages to the queue
-- makeline-service has no work to process
-- Orders may appear accepted but never fulfilled
+- `activation-service` cannot publish provisioning work to the queue
+- `provisioning-service` has no work to process
+- Activations may appear accepted in the portal but never complete provisioning
 
 **Diagnostic steps:**
-1. Check RabbitMQ pod:
+1. Check the `provisioning-queue` pod:
    ```bash
-   kubectl get pods -l app=rabbitmq -n pets
-   kubectl logs -l app=rabbitmq -n pets --tail=20
+   kubectl get pods -l app=provisioning-queue -n movistar
+   kubectl logs -l app=provisioning-queue -n movistar --tail=20
    ```
 2. Check dependent service logs:
    ```bash
-   kubectl logs -l app=order-service -n pets --tail=10 | grep -i "rabbit\|amqp\|queue"
+   kubectl logs -l app=activation-service -n movistar --tail=10 | grep -i "rabbit\|amqp\|queue"
    ```
 
 **Remediation:**
-- Restart RabbitMQ:
+- Restart `provisioning-queue`:
   ```bash
-  kubectl rollout restart deployment rabbitmq -n pets
+  kubectl rollout restart deployment provisioning-queue -n movistar
   ```
 - Scale back if needed:
   ```bash
-  kubectl scale deployment rabbitmq -n pets --replicas=1
+  kubectl scale deployment provisioning-queue -n movistar --replicas=1
   ```
 
 ---
@@ -127,13 +129,13 @@ When multiple services report errors simultaneously, the root cause is usually a
 To demonstrate root cause analysis, trace the failure chain:
 
 1. **Identify symptoms:** Multiple services failing
-2. **Find the common dependency:** Usually mongodb or rabbitmq
-3. **Verify the dependency is down:** Check pod status, replica count
+2. **Find the common dependency:** Usually `subscriber-db` or `provisioning-queue`
+3. **Verify the dependency is down:** Check pod status and replica count
 4. **Trace the timeline:** When did the dependency go down? Query events:
    ```bash
-   kubectl get events -n pets --sort-by=.metadata.creationTimestamp | tail -20
+   kubectl get events -n movistar --sort-by=.metadata.creationTimestamp | tail -20
    ```
-5. **Correlate:** Show that all downstream failures started after the dependency failed
+5. **Correlate:** Show that `subscriber-db` failed first, `provisioning-service` lost subscriber context, and `activation-service` then failed as the cascade moved upstream
 
 **Key investigation prompt for SRE Agent:**
 > "Trace the dependency chain — what broke first and what was impacted downstream?"

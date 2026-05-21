@@ -4,7 +4,7 @@ spec:
    name: incident-handler
    system_prompt: |
       You are an expert in triaging and diagnosing Kubernetes incidents on AKS.
-      The application is a multi-service e-commerce app in the "pets" namespace.
+      The application is the Movistar BSS application (consumer self-service + provisioning) in the "movistar" namespace.
 
       When triggered:
       1. Search the knowledge base for the relevant runbook (pod-failures,

@@ -1,6 +1,6 @@
 # Network and Connectivity Investigation Runbook
 
-Diagnose and remediate network connectivity issues in the AKS cluster running the pets e-commerce application. Covers network policy blocks, service selector mismatches, and DNS resolution failures.
+Diagnose and remediate network connectivity issues in the AKS cluster running the Movistar BSS application. Covers network policy blocks, service selector mismatches, and DNS resolution failures.
 
 ---
 
@@ -10,14 +10,14 @@ Diagnose and remediate network connectivity issues in the AKS cluster running th
 - Requests timing out between services
 - Services returning connection refused errors
 - Service endpoints list is empty
-- Orders not processing despite all pods being "Running"
+- Line activations not processing despite all pods being "Running"
 
 | Symptom | Likely Cause | Jump To |
 |---------|-------------|---------|
 | Connection refused / timeout between pods | Network policy blocking traffic | Step 2A |
 | Service has 0 endpoints, pods are Running | Selector mismatch on Service | Step 2B |
 | DNS resolution failures | CoreDNS or service naming issue | Step 2C |
-| External traffic cannot reach store-front | Ingress / LoadBalancer misconfiguration | Step 2D |
+| External traffic cannot reach customer-portal | Ingress / LoadBalancer misconfiguration | Step 2D |
 
 ---
 
@@ -28,25 +28,25 @@ Diagnose and remediate network connectivity issues in the AKS cluster running th
 **Diagnostic steps:**
 1. List network policies:
    ```bash
-   kubectl get networkpolicies -n pets
+   kubectl get networkpolicies -n movistar
    ```
 2. Inspect the blocking policy:
    ```bash
-   kubectl describe networkpolicy <policy-name> -n pets
+   kubectl describe networkpolicy <policy-name> -n movistar
    ```
 3. Test connectivity between pods:
    ```bash
-   kubectl exec <source-pod> -n pets -- curl -s --connect-timeout 5 http://order-service:3000/health
+   kubectl exec <source-pod> -n movistar -- curl -s --connect-timeout 5 http://activation-service:3000/health
    ```
 4. Check if the policy denies all ingress:
    ```bash
-   kubectl get networkpolicy <policy-name> -n pets -o jsonpath='{.spec.ingress}'
+   kubectl get networkpolicy <policy-name> -n movistar -o jsonpath='{.spec.ingress}'
    ```
 
 **Remediation:**
 - Delete the blocking network policy:
   ```bash
-  kubectl delete networkpolicy <policy-name> -n pets
+  kubectl delete networkpolicy <policy-name> -n movistar
   ```
 - Or apply the healthy baseline which removes scenario-injected policies:
   ```bash
@@ -62,19 +62,20 @@ Diagnose and remediate network connectivity issues in the AKS cluster running th
 **Diagnostic steps:**
 1. Check service endpoints:
    ```bash
-   kubectl get endpoints <service-name> -n pets
+   kubectl get endpoints activation-service -n movistar
    ```
-2. Compare service selector to pod labels:
+2. Compare the Service selector to pod labels:
    ```bash
-   kubectl get svc <service-name> -n pets -o jsonpath='{.spec.selector}'
-   kubectl get pods -n pets --show-labels | grep <service-name>
+   kubectl get svc activation-service -n movistar -o jsonpath='{.spec.selector}'
+   kubectl get pods -n movistar -l app=activation-service --show-labels
    ```
 3. Look for label drift:
    ```bash
-   kubectl get deployment <service-name> -n pets -o jsonpath='{.spec.template.metadata.labels}'
+   kubectl get deployment activation-service -n movistar -o jsonpath='{.spec.template.metadata.labels}'
+   kubectl get svc activation-service -n movistar -o yaml | grep activation-service-v2
    ```
 
-**Key insight:** This is a *silent failure* — all pods appear healthy, but traffic never reaches them because the Service selector doesn't match the pod labels. SRE Agent should compare `.spec.selector` on the Service with `.metadata.labels` on the pods.
+**Key insight:** This is a *silent failure* — all pods appear healthy, but traffic never reaches them because the Service selector does not match the pod labels. In this scenario, the Service can drift to `app=activation-service-v2` while the deployment still labels pods as `app=activation-service`.
 
 **Remediation:**
 - Fix the Service selector to match pod labels
@@ -89,7 +90,7 @@ Diagnose and remediate network connectivity issues in the AKS cluster running th
 **Diagnostic steps:**
 1. Test DNS from inside a pod:
    ```bash
-   kubectl exec <pod-name> -n pets -- nslookup mongodb.pets.svc.cluster.local
+   kubectl exec <pod-name> -n movistar -- nslookup subscriber-db.movistar.svc.cluster.local
    ```
 2. Check CoreDNS pods:
    ```bash
@@ -101,23 +102,23 @@ Diagnose and remediate network connectivity issues in the AKS cluster running th
    ```
 
 **Remediation:**
-- Restart CoreDNS if it's unhealthy
+- Restart CoreDNS if it is unhealthy
 - Verify Service names match what applications expect
 
 ---
 
 ## Step 2D: External Access Issues
 
-**Symptoms:** External users cannot reach the store-front
+**Symptoms:** External users cannot reach the customer-portal
 
 **Diagnostic steps:**
-1. Check LoadBalancer service:
+1. Check the LoadBalancer service:
    ```bash
-   kubectl get svc store-front -n pets
+   kubectl get svc customer-portal -n movistar
    ```
-2. Verify external IP is assigned:
+2. Verify an external IP is assigned:
    ```bash
-   kubectl get svc store-front -n pets -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+   kubectl get svc customer-portal -n movistar -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
    ```
 3. Test external connectivity:
    ```bash
@@ -125,22 +126,22 @@ Diagnose and remediate network connectivity issues in the AKS cluster running th
    ```
 
 **Remediation:**
-- Wait for LoadBalancer IP to be provisioned
+- Wait for the LoadBalancer IP to be provisioned
 - Check NSG rules on the AKS subnet
-- Verify the store-front pod is healthy and listening on the correct port
+- Verify the `customer-portal` pod is healthy and listening on the correct port
 
 ---
 
 ## Dependency Map
 
 ```
-store-front ──→ order-service ──→ mongodb
-    │                │
-    └──→ product-service ──→ mongodb
-              │
-              └──→ rabbitmq
-                      │
-            makeline-service ──→ mongodb
+customer-portal ──→ activation-service ──→ subscriber-db
+    │                     │
+    └──→ catalog-service ──→ subscriber-db
+                  │
+                  └──→ provisioning-queue
+                          │
+               provisioning-service ──→ subscriber-db
 ```
 
 When investigating connectivity issues, trace the dependency chain to determine which link is broken.

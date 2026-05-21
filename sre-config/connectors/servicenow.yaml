@@ -1,0 +1,29 @@
+# ServiceNow Connector — Dataplane v2 API format
+# Required Settings:
+# - Register an OAuth Application Registry integration in ServiceNow for the SRE Agent.
+# - Store the OAuth Client ID and Client Secret in Azure Key Vault; never commit them.
+# - Grant the integration the scopes it needs to read users and update incidents:
+#   `useraccount` for classic integrations, or the scoped app role/scope for `x_microsoft_sre`.
+# - This connector is intended for bidirectional incident sync: ingest incidents and create/update them.
+api_version: azuresre.ai/v2
+kind: DataConnector
+spec:
+  name: servicenow
+  dataConnectorType: ServiceNow
+  dataSource: servicenow
+  instanceUrl: https://YOUR_INSTANCE.service-now.com
+  tokenUrl: https://YOUR_INSTANCE.service-now.com/oauth_token.do
+  tableName: incident
+  authenticationType: OAuth2
+  syncDirection: Bidirectional
+  credentials:
+    clientId: YOUR_SERVICE_NOW_CLIENT_ID
+    clientSecret: YOUR_SERVICE_NOW_CLIENT_SECRET
+    username: YOUR_SERVICE_NOW_INTEGRATION_USERNAME
+    password: YOUR_SERVICE_NOW_INTEGRATION_PASSWORD
+  # Recommended: OAuth2 with an integration user.
+  # Alternative for lab-only environments if OAuth2 is not available:
+  # authenticationType: Basic
+  # credentials:
+  #   username: YOUR_SERVICE_NOW_INTEGRATION_USERNAME
+  #   password: YOUR_SERVICE_NOW_INTEGRATION_PASSWORD

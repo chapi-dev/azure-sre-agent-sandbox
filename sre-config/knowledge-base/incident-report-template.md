@@ -11,8 +11,9 @@ Incident: <short description> (<affected service>)
 ```
 
 **Examples:**
-- `Incident: OOMKilled restarts on order-service (AKS pets namespace)`
-- `Incident: Cascading failure from MongoDB outage (AKS pets namespace)`
+- `Incident: OOMKilled restarts on activation-service (Movistar BSS)`
+- `Incident: Cascading failure from subscriber-db outage (Movistar BSS)`
+- `Incident: customer-portal could not submit prepaid top-ups (Movistar BSS)`
 
 ---
 
@@ -24,7 +25,7 @@ Use this markdown structure:
 # Incident Report: <short description>
 
 - **Cluster:** `<aks-cluster-name>`
-- **Namespace:** `pets`
+- **Namespace:** `movistar`
 - **Resource Group:** `<resource-group>`
 - **Subscription:** `<subscription-id>`
 
@@ -34,8 +35,8 @@ Use this markdown structure:
 
 ## Impact
 
-- <User-facing impact, e.g., "Store-front returned errors when placing orders">
-- <Secondary impacts, e.g., "Product catalog was unavailable for 10 minutes">
+- <User-facing impact, e.g., "customer-portal returned errors during line activation or recharge attempts">
+- <Secondary impacts, e.g., "csr-console could not load subscriber records for 10 minutes">
 
 ## Timeline (UTC)
 
@@ -49,7 +50,7 @@ Use this markdown structure:
 ### Pod Status
 
 ```
-<Output of kubectl get pods -n pets showing affected pods>
+<Output of kubectl get pods -n movistar showing affected pods>
 ```
 
 ### Container Logs
@@ -61,7 +62,7 @@ Use this markdown structure:
 ### Kubernetes Events
 
 ```
-<Relevant events from kubectl get events -n pets>
+<Relevant events from kubectl get events -n movistar>
 ```
 
 ### Metrics
@@ -77,7 +78,7 @@ Use this markdown structure:
 
 ## Remediation
 
-- **Immediate:** <what was done to fix it, e.g., "Applied healthy baseline via kubectl apply -f k8s/base/application.yaml">
+- **Immediate:** <what was done to fix it, e.g., "Restarted activation-service, restored subscriber-db to 1 replica, and reapplied k8s/base/application.yaml">
 - **Preventive:** <what should be done to prevent recurrence>
 - **Monitoring:** <alert or check to add>
 

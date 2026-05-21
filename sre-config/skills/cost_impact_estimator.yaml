@@ -1,0 +1,22 @@
+api_version: azuresre.ai/v1
+kind: Skill
+spec:
+  name: cost-impact-estimator
+  description: Estimates incident business impact from downtime, user count, and hourly ARPU assumptions.
+  runtime: python3.11
+  entrypoint: cost_impact_estimator.py:main
+  parameters:
+    - name: downtime_minutes
+      type: integer
+      description: Total user-visible downtime in minutes.
+      required: true
+    - name: affected_users
+      type: integer
+      description: Estimated number of impacted users.
+      required: true
+    - name: arpu_per_hour
+      type: number
+      description: Average revenue per user per hour.
+      default: 20
+  returns:
+    type: object

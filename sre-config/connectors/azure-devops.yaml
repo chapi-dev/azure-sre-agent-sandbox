@@ -1,0 +1,28 @@
+# Azure DevOps Connector — Dataplane v2 API format
+# PAT scopes required for the demo:
+# - Work Items: Read & Write
+# - Code: Read
+# - Build: Read
+# Microsoft Entra ID OAuth can be used instead of a PAT where supported,
+# but PAT-based setup is usually the simplest lab bootstrap path.
+api_version: azuresre.ai/v2
+kind: DataConnector
+spec:
+  name: azure-devops
+  dataConnectorType: AzureDevOps
+  dataSource: azuredevops
+  organizationUrl: https://dev.azure.com/YOUR_ORG
+  projectName: YOUR_PROJECT
+  workItemType: Bug
+  repoNames:
+    - YOUR_APP_REPO
+    - YOUR_INFRA_REPO
+  authenticationType: PAT
+  credentials:
+    pat: YOUR_AZURE_DEVOPS_PAT
+  # Alternative where delegated auth is preferred:
+  # authenticationType: OAuth2
+  # credentials:
+  #   clientId: YOUR_ENTRA_APP_CLIENT_ID
+  #   clientSecret: YOUR_ENTRA_APP_CLIENT_SECRET
+  #   tenantId: YOUR_TENANT_ID

@@ -1,0 +1,18 @@
+api_version: azuresre.ai/v1
+kind: Skill
+spec:
+  name: kql-query-builder
+  description: Builds a deterministic starter KQL query from a natural-language investigation prompt and target table.
+  runtime: python3.11
+  entrypoint: kql_query_builder.py:main
+  parameters:
+    - name: natural_language_intent
+      type: string
+      description: Plain-English investigation request such as pod restarts, OOMs, or latency analysis.
+      required: true
+    - name: target_table
+      type: string
+      description: Target Azure Monitor or Log Analytics table, such as KubePodInventory or AppRequests.
+      required: true
+  returns:
+    type: object

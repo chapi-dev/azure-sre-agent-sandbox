@@ -1,8 +1,10 @@
 # =============================================================================
-# SCENARIO 4: High CPU Utilization - Resource Exhaustion
+# Movistar BSS Application (Telefónica demo, rebranded from AKS-store-demo)
 # =============================================================================
-# This scenario deploys a stress test pod that consumes excessive CPU,
-# affecting other workloads and triggering alerts.
+# SCENARIO 4: High CPU Utilization - Service degradation
+# =============================================================================
+# This scenario deploys a rogue workload that consumes excessive CPU on the
+# Movistar BSS nodes, degrading platform performance.
 #
 # SRE Agent can diagnose: High CPU usage, resource contention, recommend
 # scaling, resource limits, or investigating the workload.
@@ -11,14 +13,14 @@
 # kubectl apply -f k8s/scenarios/high-cpu.yaml
 #
 # HOW TO FIX:
-# kubectl delete deployment cpu-stress-test -n pets
+# kubectl delete deployment cpu-stress-test -n movistar
 # =============================================================================
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cpu-stress-test
-  namespace: pets
+  namespace: movistar
   labels:
     app: cpu-stress-test
     scenario: high-cpu

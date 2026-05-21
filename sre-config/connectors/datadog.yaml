@@ -1,0 +1,20 @@
+# Datadog Connector — Dataplane v2 API format
+# Required Datadog permissions/scopes for incident context:
+# - Monitors Read
+# - Metrics Read
+# - Events Read
+# Prefer a service account or app key scoped only to the org, site, env, and services
+# that the lab needs to query.
+api_version: azuresre.ai/v2
+kind: DataConnector
+spec:
+  name: datadog
+  dataConnectorType: Datadog
+  dataSource: datadog
+  site: datadoghq.com
+  defaultEnv: prod
+  defaultService: movistar-bss
+  authenticationType: ApiKeyAppKey
+  credentials:
+    apiKey: YOUR_DATADOG_API_KEY
+    appKey: YOUR_DATADOG_APP_KEY
