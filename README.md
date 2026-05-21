@@ -1,4 +1,4 @@
-# Movistar BSS Demo Lab ��
+# Movistar SRE Agent BSS Demo Lab 
 
 **Telefónica Movistar self-service + provisioning platform simulator on AKS**
 
