@@ -440,16 +440,6 @@ module mockCmdbFunction 'modules/mock-cmdb-function.bicep' = if (deploySkillsAnd
   }
 }
 
-resource mockCmdbFunctionApp 'Microsoft.Web/sites@2023-12-01' existing = if (deploySkillsAndHooks) {
-  scope: resourceGroup
-  name: mockCmdbFunction!.outputs.functionAppName
-}
-
-resource mockCmdbFunctionHost 'Microsoft.Web/sites/host@2022-09-01' existing = if (deploySkillsAndHooks) {
-  parent: mockCmdbFunctionApp
-  name: 'default'
-}
-
 module auditStorage 'modules/audit-storage.bicep' = if (deploySkillsAndHooks) {
   scope: resourceGroup
   name: 'deploy-audit-storage'
@@ -557,9 +547,7 @@ output avdWorkspaceName string = deployAvd ? last(split(avd!.outputs.workspaceRe
 output avdApplicationGroupId string = deployAvd ? avd!.outputs.applicationGroupId : ''
 output citrixMcpContainerAppFqdn string = deployCitrixMcp ? citrixMcpContainer!.outputs.containerAppFqdn : ''
 output mockCmdbUrl string = deploySkillsAndHooks ? 'https://${mockCmdbFunction!.outputs.functionAppDefaultHostName}/api' : ''
-@secure()
-#disable-next-line outputs-should-not-contain-secrets
-output mockCmdbFunctionKey string = deploySkillsAndHooks ? mockCmdbFunctionHost!.listKeys().functionKeys.default : ''
+output mockCmdbFunctionName string = deploySkillsAndHooks ? mockCmdbFunction!.outputs.functionAppName : ''
 output auditStorageName string = deploySkillsAndHooks ? auditStorage!.outputs.storageAccountName : ''
 output costWorkbookId string = deployGovernance ? costWorkbook!.outputs.workbookId : ''
 output costAlertId string = deployGovernance ? costAlerts!.outputs.alertId : ''
