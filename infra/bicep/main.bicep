@@ -53,21 +53,33 @@ param kubernetesVersion string = ''
 
 @description('AKS system node pool VM size')
 @allowed([
+  'Standard_D2s_v3'
+  'Standard_D4s_v3'
   'Standard_D2s_v5'
   'Standard_D4s_v5'
   'Standard_D2as_v5'
   'Standard_D4as_v5'
+  'Standard_D2s_v6'
+  'Standard_D4s_v6'
+  'Standard_D2as_v6'
+  'Standard_D4as_v6'
 ])
-param systemNodeVmSize string = 'Standard_D2s_v5'
+param systemNodeVmSize string = 'Standard_D2s_v3'
 
 @description('AKS user node pool VM size for workloads')
 @allowed([
+  'Standard_D2s_v3'
+  'Standard_D4s_v3'
   'Standard_D2s_v5'
   'Standard_D4s_v5'
   'Standard_D2as_v5'
   'Standard_D4as_v5'
+  'Standard_D2s_v6'
+  'Standard_D4s_v6'
+  'Standard_D2as_v6'
+  'Standard_D4as_v6'
 ])
-param userNodeVmSize string = 'Standard_D2s_v5'
+param userNodeVmSize string = 'Standard_D2s_v3'
 
 @description('System node pool node count')
 @minValue(1)

@@ -195,7 +195,7 @@ tokenUsage
 }
 
 resource workbook 'Microsoft.Insights/workbooks@2022-04-01' = {
-  name: name
+  name: guid(resourceGroup().id, name)
   location: location
   tags: tags
   kind: 'shared'

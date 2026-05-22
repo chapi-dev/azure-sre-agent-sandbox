@@ -30,7 +30,7 @@ param vnetSubnetId string
 param sessionHostCount int = 2
 
 @description('VM size for the session hosts')
-param vmSize string = 'Standard_D2s_v5'
+param vmSize string = 'Standard_D2s_v3'
 
 @description('Local administrator username for the session hosts')
 param adminUsername string
